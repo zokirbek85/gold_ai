@@ -7,11 +7,14 @@ RUN apt-get update \
        build-essential libpq-dev gcc libssl-dev ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN pip install --upgrade pip setuptools wheel \
     && pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Copy backend app code
+COPY backend/ .
+# Copy shared src modules (signals, ML, risk management, etc.)
+COPY src/ ./src/
 
 RUN mkdir -p /app/models
 

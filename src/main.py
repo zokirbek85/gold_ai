@@ -12,6 +12,7 @@ from src.api.ml.routes import router as ml_router
 from src.api.news.routes import router as news_router
 from src.api.patterns.routes import router as patterns_router
 from src.api.realtime.routes import router as realtime_router
+from src.api.journal.routes import router as journal_router
 from src.api.signals.routes import router as signals_router
 from src.api.smc.routes import router as smc_router
 from src.api.telegram.routes import router as telegram_router
@@ -56,7 +57,8 @@ app.include_router(ml_router, prefix="/api/v1/ml", tags=["Machine Learning"])
 app.include_router(ai_router, prefix="/api/v1/ai", tags=["AI Analysis"])
 
 # Signals + Trading
-app.include_router(signals_router, prefix="/api/v1/signals", tags=["Trading Signals"])
+app.include_router(signals_router,  prefix="/api/v1/signals",  tags=["Trading Signals"])
+app.include_router(journal_router,  prefix="/api/v1/journal",  tags=["Trade Journal"])
 app.include_router(backtesting_router, prefix="/api/v1/backtesting", tags=["Backtesting"])
 
 # Notifications

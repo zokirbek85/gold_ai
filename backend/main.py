@@ -130,6 +130,7 @@ from routers.ai import router as ai_router
 from routers.backtesting import router as backtesting_router
 from routers.admin import router as admin_router
 from routers.forecast import router as forecast_router
+from routers.telegram_service import router as telegram_router
 
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(market_data_router, prefix="/api/v1/market-data", tags=["Market Data"])
@@ -144,6 +145,7 @@ app.include_router(ai_router, prefix="/api/v1/ai", tags=["AI"])
 app.include_router(backtesting_router, prefix="/api/v1/backtesting", tags=["Backtesting"])
 app.include_router(admin_router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(forecast_router, prefix="/api/v1/forecast", tags=["Forecast"])
+app.include_router(telegram_router, prefix="/api/v1/telegram", tags=["Telegram"])
 
 
 @app.get("/api/v1/health", tags=["Health"])

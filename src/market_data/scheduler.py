@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -17,6 +17,11 @@ from src.indicators.repository import IndicatorRepository
 log = logging.getLogger(__name__)
 
 scheduler: Optional[BackgroundScheduler] = None
+
+# Tracks when we last checked ML auto-train per "symbol:timeframe" key.
+# Checked at most once every 6 hours to avoid re-training on every ingest tick.
+_last_train_check: Dict[str, datetime] = {}
+_TRAIN_CHECK_INTERVAL = timedelta(hours=6)
 
 
 def _parse_list(value: Optional[str], cast_type: Any, default: List[Any]) -> List[Any]:
@@ -63,6 +68,30 @@ def _to_float(value: Any) -> float:
 
 def _session() -> Session:
     return SessionLocal()
+
+
+def _maybe_auto_train(db: Session, symbol: str, timeframe: str) -> None:
+    """
+    Trigger ML auto-training at most once every 6 hours per symbol+timeframe.
+    Runs inline (blocking) — the candle ingestion job runs in a background thread,
+    so this won't affect API latency.
+    """
+    key = f"{symbol}:{timeframe}"
+    last = _last_train_check.get(key)
+    now = datetime.utcnow()
+
+    if last is not None and (now - last) < _TRAIN_CHECK_INTERVAL:
+        return  # too soon to check again
+
+    _last_train_check[key] = now
+
+    try:
+        from src.machine_learning.trainer import auto_train_if_needed
+        result = auto_train_if_needed(db, symbol, timeframe)
+        if result["trained"]:
+            log.info("Auto-trained ML model [%s %s]: %s", symbol, timeframe, result["metrics"])
+    except Exception:
+        log.exception("ML auto-train check failed [%s %s]", symbol, timeframe)
 
 
 def ingest_ticks(db: Session, symbol: str) -> None:
@@ -149,7 +178,12 @@ def ingest_candles(db: Session, symbol: str, timeframe: int) -> None:
         )
         publish("market-data-updates", {"type": "candle", "symbol": symbol, "timeframe": timeframe_key, "timestamp": timestamp.isoformat(), "open": open_price, "high": high_price, "low": low_price, "close": close_price, "volume": volume})
         publish(f"market-data-updates:{symbol}", {"type": "candle", "symbol": symbol, "timeframe": timeframe_key, "timestamp": timestamp.isoformat(), "open": open_price, "high": high_price, "low": low_price, "close": close_price, "volume": volume})
+
     db.commit()
+
+    # After a successful ingestion batch, check if ML auto-training is due.
+    # _maybe_auto_train gates itself to at most once every 6 hours.
+    _maybe_auto_train(db, symbol, str(timeframe))
 
 
 def ingest_market_data() -> None:

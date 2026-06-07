@@ -45,12 +45,14 @@ class MLPredictor:
         """
         Predict from a feature dict.
         Returns: {"buy_pct": float, "sell_pct": float, "neutral_pct": float,
-                  "direction": str, "score": float, "models_used": int}
+                  "direction": str, "score": float, "models_used": int,
+                  "model_available": bool}
         """
         if not self._models:
             self.load_latest()
 
         if not self._models:
+            log.warning("No trained model found — returning calibrated neutral")
             return {
                 "buy_pct": 33.3,
                 "sell_pct": 33.3,
@@ -58,15 +60,16 @@ class MLPredictor:
                 "direction": "neutral",
                 "score": 50.0,
                 "models_used": 0,
-                "note": "No trained models available",
+                "model_available": False,
+                "message": "Model training pending — need 500 candles",
             }
 
         feature_names = self._feature_names or sorted(features.keys())
         x = [[features.get(f, 0.0) for f in feature_names]]
 
-        buy_votes = 0
-        sell_votes = 0
-        neutral_votes = 0
+        buy_votes = 0.0
+        sell_votes = 0.0
+        neutral_votes = 0.0
 
         for model_type, model in self._models.items():
             try:
@@ -85,10 +88,10 @@ class MLPredictor:
         n = len(self._models)
         buy_pct = buy_votes / n * 100
         sell_pct = sell_votes / n * 100
-        neutral_pct = neutral_votes / n * 100 if neutral_votes > 0 else max(0, 100 - buy_pct - sell_pct)
+        neutral_pct = neutral_votes / n * 100 if neutral_votes > 0 else max(0.0, 100 - buy_pct - sell_pct)
 
         # Score: >50 bullish, <50 bearish
-        score = 50 + (buy_pct - sell_pct) / 2
+        score = 50.0 + (buy_pct - sell_pct) / 2
 
         if buy_pct > sell_pct and buy_pct > 45:
             direction = "bullish"
@@ -104,6 +107,7 @@ class MLPredictor:
             "direction": direction,
             "score": round(score, 1),
             "models_used": n,
+            "model_available": True,
         }
 
 

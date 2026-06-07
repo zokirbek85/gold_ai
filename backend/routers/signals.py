@@ -13,6 +13,7 @@ from services.market_service import fetch_and_store
 from services.news_service import get_sentiment_summary
 from services.calendar_service import get_aggregate_score
 from services.telegram_service import alert_signal
+from src.signals.scorer import signal_scorer
 
 router = APIRouter()
 
@@ -45,6 +46,10 @@ class GenerateSignalIn(BaseModel):
     symbol: str = "XAUUSD"
     timeframe: str = "60"
     account_balance: float = 10000.0
+    # Multi-timeframe confluence timeframes
+    timeframe_trend:   str = "240"   # H4 — trend direction
+    timeframe_primary: str = "60"    # H1 — signal direction (mirrors timeframe by default)
+    timeframe_confirm: str = "15"    # M15 — entry trigger
 
 
 def _load_candles(db: Session, symbol: str, timeframe: str, limit: int = 300) -> list:
@@ -57,6 +62,41 @@ def _load_candles(db: Session, symbol: str, timeframe: str, limit: int = 300) ->
     )
     return [{"open": r.open, "high": r.high, "low": r.low,
              "close": r.close, "volume": r.volume} for r in rows]
+
+
+def _apply_confluence(
+    result: Dict[str, Any],
+    candles_h4: list,
+    candles_h1: list,
+    candles_m15: list,
+) -> Dict[str, Any]:
+    """
+    Compute multi-TF confluence and blend it into the signal result dict.
+    Mutates and returns result.
+    """
+    direction = result.get("direction", "neutral")
+    # Use a concrete direction for scoring even when composite is in neutral zone
+    conf_dir = direction if direction != "neutral" else (
+        "bullish" if result.get("composite_score", 50) > 50 else "bearish"
+    )
+
+    confluence = signal_scorer.confluence_score(candles_h4, candles_h1, candles_m15, conf_dir)
+    alignment  = confluence["alignment"]
+
+    composite = float(result.get("composite_score", 50.0))
+    if alignment == "full":
+        composite = min(100.0, composite + 8)
+    elif alignment == "partial":
+        composite = min(100.0, composite + 3)
+    else:  # conflict
+        composite = max(0.0, composite - 10)
+        if composite < 70 and result.get("signal_type") != "NO TRADE":
+            result["signal_type"] = "NO TRADE"
+            result["direction"]   = "neutral"
+
+    result["composite_score"] = round(composite, 1)
+    result["confluence"]      = confluence
+    return result
 
 
 @router.post("/generate")
@@ -95,6 +135,18 @@ def generate(
         econ_parts=econ_parts,
     )
 
+    # ── Multi-timeframe confluence ──────────────────────────────────────────
+    # Fetch candles for trend (H4), primary (H1), and confirm (M15) timeframes.
+    # These may overlap with the primary timeframe — that's intentional.
+    candles_trend   = _load_candles(db, payload.symbol, payload.timeframe_trend)
+    candles_primary = _load_candles(db, payload.symbol, payload.timeframe_primary)
+    candles_confirm = _load_candles(db, payload.symbol, payload.timeframe_confirm)
+
+    if len(candles_trend) >= 50 and len(candles_primary) >= 50 and len(candles_confirm) >= 50:
+        result = _apply_confluence(result, candles_trend, candles_primary, candles_confirm)
+    else:
+        result.setdefault("confluence", None)
+
     sig = Signal(
         symbol=result["symbol"],
         timeframe=result["timeframe"],
@@ -117,7 +169,7 @@ def generate(
     db.commit()
     db.refresh(sig)
 
-    result["id"] = sig.id
+    result["id"]         = sig.id
     result["created_at"] = sig.created_at
 
     # Send Telegram alert for BUY/SELL signals (non-blocking)

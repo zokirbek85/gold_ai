@@ -1,4 +1,6 @@
+import uuid
 from datetime import datetime
+from typing import Optional
 from sqlalchemy import (
     Column,
     Integer,
@@ -200,13 +202,53 @@ class Trade(Base):
     user = relationship("User")
 
 
-class TradeJournal(Base):
-    __tablename__ = "trade_journal"
+class TradeNote(Base):
+    """Legacy per-trade note (kept for backwards-compat). New journal: TradeJournal."""
+    __tablename__ = "trade_notes"
     id = Column(Integer, primary_key=True)
     trade_id = Column(Integer, ForeignKey("trades.id"))
     note = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     trade = relationship("Trade")
+
+
+class TradeJournal(Base):
+    __tablename__ = "trade_journal"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    signal_id = Column(Integer, ForeignKey("signals.id"), nullable=True, index=True)
+    symbol = Column(String(20), nullable=False, default="XAUUSD", index=True)
+    direction = Column(String(10), nullable=False)           # BUY | SELL
+    entry_price = Column(Float, nullable=False)
+    exit_price = Column(Float, nullable=True)
+    stop_loss = Column(Float, nullable=False)
+    take_profit = Column(Float, nullable=False)
+    lot_size = Column(Float, nullable=False)
+    status = Column(String(20), nullable=False, default="open", index=True)  # open | closed | cancelled
+    pnl_usd = Column(Float, nullable=True)
+    pnl_pips = Column(Float, nullable=True)
+    exit_reason = Column(String(50), nullable=True)          # tp_hit | sl_hit | manual | time_exit
+    emotion_rating = Column(Integer, nullable=True)          # 1–5
+    notes = Column(Text, nullable=True)
+    opened_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    closed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+    signal = relationship("Signal")
+
+    @property
+    def risk_reward_actual(self) -> Optional[float]:
+        if self.exit_price is None or self.entry_price is None or self.stop_loss is None:
+            return None
+        sl_dist = abs(self.entry_price - self.stop_loss)
+        if sl_dist == 0:
+            return None
+        if self.direction == "BUY":
+            return (self.exit_price - self.entry_price) / sl_dist
+        # SELL
+        return (self.entry_price - self.exit_price) / sl_dist
 
 
 class Backtest(Base):

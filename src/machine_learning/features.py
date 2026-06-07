@@ -4,9 +4,12 @@ Produces a flat feature vector from OHLCV candles + optional supplementary score
 """
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional
 
 from src.indicators.calculator import calculator as ind_calc
+
+log = logging.getLogger(__name__)
 
 
 class FeatureEngineer:
@@ -104,29 +107,57 @@ class FeatureEngineer:
     def build_dataset(
         self,
         candles: List[Dict[str, Any]],
-        lookahead: int = 1,
+        look_ahead: int = 12,
     ) -> List[Dict[str, Any]]:
         """
         Build a labelled dataset from a candle series.
-        Label: 1 (price rises in `lookahead` bars), 0 (falls), 2 (flat < 0.1%)
+
+        Labels (neutral rows are skipped for a cleaner signal):
+          1 (BUY)  — future close > current close * 1.003  (+0.3%)
+          0 (SELL) — future close < current close * 0.997  (-0.3%)
+
+        look_ahead=12 means 12 bars forward (12 hours on H1).
+        Warns if either class makes up less than 30% of the dataset.
         """
-        dataset = []
+        dataset: List[Dict[str, Any]] = []
         min_history = 30
-        for i in range(min_history, len(candles) - lookahead):
-            window = candles[:i + 1]
+
+        for i in range(min_history, len(candles) - look_ahead):
+            window = candles[: i + 1]
             features = self.build_features(window)
             if not features:
                 continue
+
             current_close = float(candles[i]["close"])
-            future_close = float(candles[i + lookahead]["close"])
-            change_pct = (future_close - current_close) / current_close if current_close else 0
-            if change_pct > 0.001:
+            future_close = float(candles[i + look_ahead]["close"])
+
+            if current_close <= 0:
+                continue
+
+            if future_close > current_close * 1.003:
                 label = 1  # BUY
-            elif change_pct < -0.001:
+            elif future_close < current_close * 0.997:
                 label = 0  # SELL
             else:
-                label = 2  # NEUTRAL
+                continue  # skip neutral — tighter labels, cleaner signal
+
             dataset.append({"features": features, "label": label})
+
+        if dataset:
+            n = len(dataset)
+            buy_count = sum(1 for d in dataset if d["label"] == 1)
+            sell_count = n - buy_count
+            buy_pct = buy_count / n
+            sell_pct = sell_count / n
+            if buy_pct < 0.30 or sell_pct < 0.30:
+                log.warning(
+                    "Label imbalance detected: BUY=%.1f%% SELL=%.1f%% (n=%d) — "
+                    "model may be biased; consider adjusting look_ahead or thresholds",
+                    buy_pct * 100,
+                    sell_pct * 100,
+                    n,
+                )
+
         return dataset
 
 

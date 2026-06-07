@@ -1,9 +1,10 @@
 """
-Telegram bot service — long-polling, inline keyboard buttons.
+Telegram bot service — long-polling, inline keyboard buttons, alert filtering.
 Starts in a background thread on app startup.
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import threading
@@ -15,8 +16,69 @@ import httpx
 
 log = logging.getLogger(__name__)
 
-TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-_BASE = f"https://api.telegram.org/bot{TOKEN}"
+
+class AlertFilter:
+    """
+    Prevents signal spam by enforcing confidence thresholds and cooldown windows.
+
+    Rules (evaluated in order):
+      1. NO TRADE signals are never sent.
+      2. Signals below MIN_CONFIDENCE are skipped.
+      3. Same-direction alerts within COOLDOWN_MINUTES are suppressed.
+         Direction-reversal alerts require DIRECTION_CHANGE_COOLDOWN minutes.
+      4. Re-alerts on the same direction are only sent if confidence improved
+         by more than 15 points within COOLDOWN_MINUTES * 2.
+    """
+
+    MIN_CONFIDENCE:            float = 65.0
+    COOLDOWN_MINUTES:          float = 30.0
+    DIRECTION_CHANGE_COOLDOWN: float = 5.0
+
+    def __init__(self) -> None:
+        self._last_signal:  Dict[str, Any]     = {}
+        self._last_sent_at: Dict[str, datetime] = {}
+
+    def should_send(self, signal: Dict[str, Any]) -> tuple[bool, str]:
+        symbol     = signal.get("symbol", "XAUUSD")
+        sig_type   = signal.get("signal_type")
+        confidence = float(signal.get("confidence") or 0)
+
+        if sig_type == "NO TRADE":
+            return False, "no_trade"
+
+        if confidence < self.MIN_CONFIDENCE:
+            return False, f"low_confidence_{confidence:.0f}"
+
+        last      = self._last_signal.get(symbol, {})
+        last_sent = self._last_sent_at.get(symbol)
+
+        elapsed: Optional[float] = (
+            (datetime.utcnow() - last_sent).total_seconds() / 60
+            if last_sent else None
+        )
+
+        if elapsed is not None:
+            same_direction = last.get("signal_type") == sig_type
+            if same_direction and elapsed < self.COOLDOWN_MINUTES:
+                return False, f"cooldown_{elapsed:.0f}min"
+            if not same_direction and elapsed < self.DIRECTION_CHANGE_COOLDOWN:
+                return False, "direction_change_too_fast"
+
+        if last and last.get("signal_type") == sig_type:
+            prev_conf = float(last.get("confidence") or 0)
+            if confidence - prev_conf < 15:
+                if elapsed is not None and elapsed < self.COOLDOWN_MINUTES * 2:
+                    return False, "no_significant_improvement"
+
+        return True, "ok"
+
+    def record_sent(self, signal: Dict[str, Any]) -> None:
+        symbol = signal.get("symbol", "XAUUSD")
+        self._last_signal[symbol]  = signal
+        self._last_sent_at[symbol] = datetime.utcnow()
+
+TOKEN    = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+_BASE    = f"https://api.telegram.org/bot{TOKEN}"
 
 _registered_chats: Set[str] = set()
 _lock = threading.Lock()
@@ -25,14 +87,86 @@ _ENV_CHAT = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 if _ENV_CHAT:
     _registered_chats.add(_ENV_CHAT)
 
+# Filter singleton — shared state persists for the life of the process
+_alert_filter = AlertFilter()
 
-# ── HTTP ──────────────────────────────────────────────────────────────────────
+
+# ── Redis stats (best-effort; degrades gracefully when Redis is down) ─────────
+
+_REDIS_SENT_KEY    = "tg:sent_today"
+_REDIS_BLOCKED_KEY = "tg:blocked_today"
+_REDIS_LAST_KEY    = "tg:last_signal"
+_TTL               = 86_400   # one calendar day in seconds
+
+try:
+    import redis as _redis_mod
+    _redis = _redis_mod.Redis.from_url(
+        os.environ.get("REDIS_URL", "redis://redis:6379/0"),
+        decode_responses=True,
+        socket_connect_timeout=2,
+        socket_timeout=2,
+    )
+except Exception:
+    _redis = None
+
+
+def _redis_incr(key: str) -> None:
+    if _redis is None:
+        return
+    try:
+        pipe = _redis.pipeline()
+        pipe.incr(key)
+        pipe.expire(key, _TTL)
+        pipe.execute()
+    except Exception as exc:
+        log.debug("Redis incr error (%s): %s", key, exc)
+
+
+def _redis_get_int(key: str) -> int:
+    if _redis is None:
+        return 0
+    try:
+        val = _redis.get(key)
+        return int(val) if val else 0
+    except Exception:
+        return 0
+
+
+def _redis_set_json(key: str, value: Any) -> None:
+    if _redis is None:
+        return
+    try:
+        _redis.set(key, json.dumps(value, default=str), ex=_TTL)
+    except Exception as exc:
+        log.debug("Redis set error (%s): %s", key, exc)
+
+
+def _redis_get_json(key: str) -> Optional[Any]:
+    if _redis is None:
+        return None
+    try:
+        raw = _redis.get(key)
+        return json.loads(raw) if raw else None
+    except Exception:
+        return None
+
+
+def get_filter_stats() -> Dict[str, Any]:
+    """Return today's send/block counters and the last forwarded signal."""
+    return {
+        "sent_today":    _redis_get_int(_REDIS_SENT_KEY),
+        "blocked_today": _redis_get_int(_REDIS_BLOCKED_KEY),
+        "last_signal":   _redis_get_json(_REDIS_LAST_KEY),
+    }
+
+
+# ── HTTP helpers ──────────────────────────────────────────────────────────────
 
 def _post(method: str, **kwargs) -> Optional[Dict]:
     if not TOKEN:
         return None
     try:
-        r = httpx.post(f"{_BASE}/{method}", json=kwargs, timeout=15)
+        r    = httpx.post(f"{_BASE}/{method}", json=kwargs, timeout=15)
         data = r.json()
         if not data.get("ok"):
             log.warning("Telegram %s: %s", method, data.get("description"))
@@ -47,7 +181,7 @@ def _get(method: str, http_timeout: int = 15, **params) -> Optional[Dict]:
     if not TOKEN:
         return None
     try:
-        r = httpx.get(f"{_BASE}/{method}", params=params, timeout=http_timeout)
+        r    = httpx.get(f"{_BASE}/{method}", params=params, timeout=http_timeout)
         data = r.json()
         return data if data.get("ok") else None
     except Exception as exc:
@@ -55,19 +189,18 @@ def _get(method: str, http_timeout: int = 15, **params) -> Optional[Dict]:
         return None
 
 
-# ── send helpers ──────────────────────────────────────────────────────────────
+# ── Send helpers ──────────────────────────────────────────────────────────────
 
 def _kb(*rows) -> Dict:
     """Build inline_keyboard from rows of (text, callback_data) tuples."""
     return {"inline_keyboard": [[{"text": t, "callback_data": d} for t, d in row] for row in rows]}
 
 
-# Reusable bottom row
-_MENU_ROW   = [("🏠 Bosh Menyu", "menu")]
-_REFRESH_PRICE  = [("🔄 Yangilash", "price"), ("📊 Signal", "signal")]
-_REFRESH_NEWS   = [("🔄 Yangilash", "news"),  ("🔍 Tahlil",  "analysis")]
+_MENU_ROW       = [("🏠 Bosh Menyu", "menu")]
+_REFRESH_PRICE  = [("🔄 Yangilash", "price"),  ("📊 Signal",  "signal")]
+_REFRESH_NEWS   = [("🔄 Yangilash", "news"),   ("🔍 Tahlil",  "analysis")]
 _SIGNAL_ACTIONS = [("🔄 Yangi Signal", "signal")]
-_AFTER_SIGNAL   = [("💰 Narx", "price"), ("📰 Yangilik", "news")]
+_AFTER_SIGNAL   = [("💰 Narx", "price"),       ("📰 Yangilik", "news")]
 
 
 def send(chat_id: str, text: str, buttons=None) -> bool:
@@ -105,7 +238,7 @@ def get_registered_chats() -> List[str]:
         return list(_registered_chats)
 
 
-# ── command handlers ──────────────────────────────────────────────────────────
+# ── Command handlers ──────────────────────────────────────────────────────────
 
 def _handle_start(chat_id: str) -> None:
     register_chat(chat_id)
@@ -150,13 +283,13 @@ def _handle_help(chat_id: str) -> None:
 
 def _handle_price(chat_id: str) -> None:
     try:
-        r = httpx.get("http://localhost:8001/api/v1/market-data/price",
-                      params={"symbol": "XAUUSD"}, timeout=10)
-        d = r.json()
+        r      = httpx.get("http://localhost:8001/api/v1/market-data/price",
+                            params={"symbol": "XAUUSD"}, timeout=10)
+        d      = r.json()
         price  = d.get("price") or 0.0
         change = d.get("change_pct") or 0.0
         arrow  = "📈" if change >= 0 else "📉"
-        kb = _kb(_REFRESH_PRICE, _MENU_ROW)
+        kb     = _kb(_REFRESH_PRICE, _MENU_ROW)
         send(chat_id,
              f"{arrow} *XAUUSD Narxi*\n\n"
              f"💰 `{price:.2f}` USD\n"
@@ -164,8 +297,7 @@ def _handle_price(chat_id: str) -> None:
              f"_{datetime.utcnow().strftime('%H:%M UTC')}_",
              buttons=kb)
     except Exception as exc:
-        send(chat_id, f"⚠️ Narx olishda xatolik: {exc}",
-             buttons=_kb(_MENU_ROW))
+        send(chat_id, f"⚠️ Narx olishda xatolik: {exc}", buttons=_kb(_MENU_ROW))
 
 
 def _handle_signal(chat_id: str) -> None:
@@ -185,8 +317,8 @@ def _handle_signal(chat_id: str) -> None:
 
 def _handle_news(chat_id: str) -> None:
     try:
-        r = httpx.get("http://localhost:8001/api/v1/news",
-                      params={"limit": 5}, timeout=10)
+        r     = httpx.get("http://localhost:8001/api/v1/news",
+                           params={"limit": 5}, timeout=10)
         items = r.json()
         if not items:
             send(chat_id, "📰 Hozircha yangilik yo'q.", buttons=_kb(_MENU_ROW))
@@ -197,8 +329,7 @@ def _handle_news(chat_id: str) -> None:
             emoji = "📈" if s == "bullish" else ("📉" if s == "bearish" else "➖")
             title = item.get("title", "")[:90]
             lines.append(f"{emoji} {title}")
-        kb = _kb(_REFRESH_NEWS, _MENU_ROW)
-        send(chat_id, "\n".join(lines), buttons=kb)
+        send(chat_id, "\n".join(lines), buttons=_kb(_REFRESH_NEWS, _MENU_ROW))
     except Exception as exc:
         send(chat_id, f"⚠️ Yangilik xatosi: {exc}", buttons=_kb(_MENU_ROW))
 
@@ -253,15 +384,16 @@ def _handle_status(chat_id: str) -> None:
         health = httpx.get("http://localhost:8001/api/v1/health", timeout=5).json()
         ok     = health.get("status") == "ok"
         chats  = len(get_registered_chats())
-        kb = _kb(
-            [("🔄 Yangilash", "status")],
-            _MENU_ROW,
-        )
+        stats  = get_filter_stats()
+        kb = _kb([("🔄 Yangilash", "status")], _MENU_ROW)
         send(chat_id,
              f"🤖 *Tizim Holati*\n\n"
              f"Backend: `{'✅ Ishlayapti' if ok else '❌ Xato'}`\n"
              f"Versiya: `{health.get('version', '?')}`\n"
              f"Faol chatlar: `{chats}`\n\n"
+             f"🔔 *Bugungi Signallar*\n"
+             f"Yuborildi: `{stats['sent_today']}`\n"
+             f"Bloklandi: `{stats['blocked_today']}`\n\n"
              f"_{datetime.utcnow().strftime('%H:%M UTC')}_",
              buttons=kb)
     except Exception:
@@ -269,8 +401,9 @@ def _handle_status(chat_id: str) -> None:
 
 
 def _send_signal_message(chat_id: str, d: Dict[str, Any]) -> None:
-    sig = d.get("signal_type", "NEUTRAL")
-    em  = "🟢" if sig == "BUY" else ("🔴" if sig == "SELL" else "⚪")
+    sig  = d.get("signal_type", "NEUTRAL")
+    em   = "🟢" if sig == "BUY" else ("🔴" if sig == "SELL" else "⚪")
+    conf = d.get("confidence") or 0
 
     def _f(v): return f"{v:.2f}" if v is not None else "—"
 
@@ -278,7 +411,6 @@ def _send_signal_message(chat_id: str, d: Dict[str, Any]) -> None:
     sl    = d.get("stop_loss")
     tp    = d.get("take_profit")
     rr    = d.get("rr")
-    conf  = d.get("confidence") or 0
     tech  = d.get("technical_score") or 50
     smc   = d.get("smc_score") or 50
     ml    = d.get("ml_score") or 50
@@ -289,11 +421,7 @@ def _send_signal_message(chat_id: str, d: Dict[str, Any]) -> None:
         filled = round(v / 10)
         return "█" * filled + "░" * (10 - filled)
 
-    kb = _kb(
-        _SIGNAL_ACTIONS,
-        _AFTER_SIGNAL,
-        _MENU_ROW,
-    )
+    kb = _kb(_SIGNAL_ACTIONS, _AFTER_SIGNAL, _MENU_ROW)
     send(chat_id,
          f"{em} *XAUUSD · H1 Signal*\n\n"
          f"💰 *Savdo Rejasi*\n"
@@ -307,23 +435,61 @@ def _send_signal_message(chat_id: str, d: Dict[str, Any]) -> None:
          f"`ML  {_bar(ml)}   {ml:.0f}`\n"
          f"`News{_bar(news)} {news:.0f}`\n\n"
          f"📝 _{rsn}_\n\n"
-         f"_{datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}_",
+         f"_Confidence: {conf:.0f}% | Filter: active | "
+         f"{datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}_",
          buttons=kb)
 
 
-# ── public alert ──────────────────────────────────────────────────────────────
+# ── Public alert (called from signals router after signal generation) ─────────
 
 def alert_signal(signal: Dict[str, Any]) -> int:
-    if signal.get("signal_type", "NEUTRAL") == "NEUTRAL":
+    """
+    Broadcast a trading signal to all registered chats after filter check.
+    Returns the number of chats the signal was delivered to (0 if filtered).
+    """
+    should, reason = _alert_filter.should_send(signal)
+    if not should:
+        log.debug(
+            "Signal filtered [%s %s conf=%.0f]: %s",
+            signal.get("symbol"), signal.get("signal_type"),
+            float(signal.get("confidence") or 0), reason,
+        )
+        _redis_incr(_REDIS_BLOCKED_KEY)
         return 0
+
     count = 0
     for cid in get_registered_chats():
         _send_signal_message(cid, signal)
         count += 1
+
+    if count > 0:
+        _alert_filter.record_sent(signal)
+        _redis_incr(_REDIS_SENT_KEY)
+        _redis_set_json(_REDIS_LAST_KEY, {
+            "symbol":      signal.get("symbol"),
+            "signal_type": signal.get("signal_type"),
+            "confidence":  signal.get("confidence"),
+            "sent_at":     datetime.utcnow().isoformat(),
+        })
+
     return count
 
 
-# ── polling ───────────────────────────────────────────────────────────────────
+def send_daily_summary(signals: List[Dict[str, Any]]) -> int:
+    """Broadcast a one-line digest of signals to all registered chats."""
+    buy_count  = sum(1 for s in signals if s.get("signal_type") == "BUY")
+    sell_count = sum(1 for s in signals if s.get("signal_type") == "SELL")
+    no_trade   = sum(1 for s in signals if s.get("signal_type") == "NO TRADE")
+    n          = len(signals)
+    text = (
+        f"📊 *Gold AI Daily: {n} signals | "
+        f"{buy_count} BUY {sell_count} SELL {no_trade} skipped*\n"
+        f"_{datetime.utcnow().strftime('%Y-%m-%d UTC')}_"
+    )
+    return broadcast(text)
+
+
+# ── Polling ───────────────────────────────────────────────────────────────────
 
 _COMMANDS = {
     "/start":    _handle_start,
@@ -350,7 +516,7 @@ _polling_thread: Optional[threading.Thread] = None
 
 def _polling_loop() -> None:
     offset = 0
-    log.info("Telegram polling started (@trade_signal_ai_gold_bot)")
+    log.info("Telegram polling started")
     while True:
         try:
             data = _get(
@@ -366,7 +532,7 @@ def _polling_loop() -> None:
             for upd in data["result"]:
                 offset = upd["update_id"] + 1
 
-                # ── inline button press ──
+                # inline button press
                 cb = upd.get("callback_query")
                 if cb:
                     cb_id   = cb["id"]
@@ -382,14 +548,14 @@ def _polling_loop() -> None:
                             log.exception("Callback %s failed", action)
                     continue
 
-                # ── text command ──
+                # text command
                 msg     = upd.get("message", {})
                 chat_id = str(msg.get("chat", {}).get("id", ""))
                 text    = (msg.get("text") or "").strip()
                 if not chat_id or not text:
                     continue
                 register_chat(chat_id)
-                cmd = text.split("@")[0].split(" ")[0].lower()
+                cmd     = text.split("@")[0].split(" ")[0].lower()
                 handler = _COMMANDS.get(cmd)
                 if handler:
                     try:
