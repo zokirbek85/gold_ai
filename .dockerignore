@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.env
+.venv
+venv
+tests/
+*.sqlite3
+dev.db
+.git
+frontend/node_modules
+frontend/.next
+models/
