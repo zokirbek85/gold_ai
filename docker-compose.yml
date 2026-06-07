@@ -1,0 +1,73 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: goldai
+      POSTGRES_PASSWORD: goldai123
+      POSTGRES_DB: goldai
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U goldai -d goldai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "8001:8001"
+    volumes:
+      - models_data:/app/models
+    environment:
+      DATABASE_URL: postgresql+psycopg2://goldai:goldai123@db:5432/goldai
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: your-secret-key-change-in-production-min-32-chars
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+      ML_MODEL_DIR: /app/models
+      CORS_ORIGINS: "http://localhost:3000,http://frontend:3000,http://localhost:4000"
+      TWELVEDATA_API_KEY: "f5b507747fc14848bc5b0556fcef80a0"
+      TELEGRAM_BOT_TOKEN: "8698653929:AAHUbXFYBVl0QyPLLOHh99Tp7B-KLERah1I"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        BACKEND_URL: http://backend:8001
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      BACKEND_URL: http://backend:8001
+      HOSTNAME: "0.0.0.0"
+      PORT: 3000
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
+  models_data:

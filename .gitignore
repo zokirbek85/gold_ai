@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Environment & secrets
+.env
+*.env.local
+
+# Database
+*.db
+*.sqlite3
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Misc
+.DS_Store
+*.log
+dev.db
+tmp_debug.py

@@ -1,0 +1,192 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Design tokens ─────────────────────────────────────── */
+:root {
+  --bg:          #0a0a0f;
+  --surface:     #111118;
+  --surface-2:   #1a1a24;
+  --surface-3:   #22222e;
+  --border:      #2a2a3a;
+  --border-2:    #363648;
+  --text:        #e8e8f0;
+  --text-muted:  #8888a0;
+  --text-faint:  #44445a;
+  --gold:        #f5a623;
+  --gold-dim:    #c47d0e;
+  --green:       #22c55e;
+  --green-dim:   #166534;
+  --red:         #ef4444;
+  --red-dim:     #7f1d1d;
+  --blue:        #3b82f6;
+}
+
+/* ── Base ───────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { font-size: 14px; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-2); }
+
+/* ── Typography ────────────────────────────────────────── */
+.font-mono {
+  font-family: "JetBrains Mono", "Fira Code", "Consolas", monospace;
+}
+
+/* ── Shared card ────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.card-hover {
+  @apply card transition-colors duration-150;
+}
+.card-hover:hover {
+  border-color: var(--border-2);
+}
+
+/* ── Signal badges ─────────────────────────────────────── */
+.badge-buy {
+  @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-bold font-mono;
+  color: var(--green);
+  background: rgba(34,197,94,0.1);
+  border: 1px solid rgba(34,197,94,0.25);
+}
+.badge-sell {
+  @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-bold font-mono;
+  color: var(--red);
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.25);
+}
+.badge-notrade {
+  @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-bold font-mono;
+  color: var(--text-muted);
+  background: rgba(136,136,160,0.1);
+  border: 1px solid rgba(136,136,160,0.2);
+}
+
+/* ── Direction colors ──────────────────────────────────── */
+.bullish  { color: var(--green); }
+.bearish  { color: var(--red); }
+.neutral  { color: var(--text-muted); }
+
+/* ── Score bar ─────────────────────────────────────────── */
+.score-bar-track {
+  @apply w-full rounded-full overflow-hidden;
+  height: 4px;
+  background: var(--surface-2);
+}
+.score-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+/* ── Table ─────────────────────────────────────────────── */
+.data-table {
+  @apply w-full text-sm;
+  border-collapse: collapse;
+}
+.data-table th {
+  @apply text-left px-3 py-2.5 text-xs font-medium uppercase tracking-wider;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.data-table td {
+  @apply px-3 py-2.5;
+  border-bottom: 1px solid var(--surface-2);
+}
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.data-table tbody tr {
+  transition: background 0.1s;
+}
+.data-table tbody tr:hover {
+  background: var(--surface-2);
+}
+
+/* ── Skeleton loader ───────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 25%,
+    var(--surface-3) 50%,
+    var(--surface-2) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+/* ── Input ─────────────────────────────────────────────── */
+.input {
+  @apply w-full text-sm rounded-lg px-3 py-2 transition-colors duration-150 outline-none;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.input:focus {
+  border-color: rgba(245,166,35,0.5);
+  box-shadow: 0 0 0 2px rgba(245,166,35,0.08);
+}
+.input::placeholder { color: var(--text-faint); }
+
+/* ── Button variants ───────────────────────────────────── */
+.btn {
+  @apply inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+}
+.btn-gold {
+  @apply btn;
+  color: var(--gold);
+  background: rgba(245,166,35,0.1);
+  border: 1px solid rgba(245,166,35,0.25);
+}
+.btn-gold:hover:not(:disabled) {
+  background: rgba(245,166,35,0.18);
+}
+.btn-ghost {
+  @apply btn;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* ── Page header ───────────────────────────────────────── */
+.page-header {
+  @apply flex items-start justify-between mb-6;
+}
+.page-title {
+  @apply text-xl font-bold;
+  color: var(--gold);
+  letter-spacing: -0.01em;
+}
+.page-subtitle {
+  @apply text-xs mt-0.5;
+  color: var(--text-muted);
+}
