@@ -42,11 +42,7 @@ export default function AnalysisPage() {
 
   const biasMut = useMutation({
     mutationFn: () =>
-      aiApi.dailyBias(
-        snapshot ? JSON.stringify(snapshot) : "No indicator data",
-        "",
-        ""
-      ).then(r => r.data),
+      aiApi.dailyBias("", "", "", snapshot ?? undefined).then(r => r.data),
   });
 
   const pd = smcAnalysis?.premium_discount;
@@ -249,14 +245,46 @@ export default function AnalysisPage() {
           </button>
         </div>
         {biasMut.data ? (
-          <div className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
-            {biasMut.data.analysis}
+          <div className="space-y-4">
+            {/* Bias summary */}
+            <div className="flex items-center gap-4 flex-wrap">
+              <span className={`text-2xl font-black px-4 py-1.5 rounded-lg ${
+                biasMut.data.direction === "bullish"
+                  ? "bg-green-500/15 text-green-400 border border-green-500/30"
+                  : biasMut.data.direction === "bearish"
+                  ? "bg-red-500/15 text-red-400 border border-red-500/30"
+                  : "bg-gray-500/10 text-gray-400 border border-gray-500/20"
+              }`}>
+                {biasMut.data.bias}
+              </span>
+              <div>
+                <p className="text-xs text-gray-500">Ishonch</p>
+                <p className={`text-xl font-bold font-mono ${
+                  biasMut.data.confidence >= 70 ? "text-green-400" :
+                  biasMut.data.confidence >= 55 ? "text-yellow-400" : "text-gray-400"
+                }`}>{biasMut.data.confidence}%</p>
+              </div>
+              {biasMut.data.bull_score !== undefined && (
+                <>
+                  <div>
+                    <p className="text-xs text-gray-500">Bull omillar</p>
+                    <p className="text-lg font-bold text-green-400">{biasMut.data.bull_score}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Bear omillar</p>
+                    <p className="text-lg font-bold text-red-400">{biasMut.data.bear_score}</p>
+                  </div>
+                </>
+              )}
+            </div>
+            {/* Reasoning */}
+            <div className="bg-[#0d0d14] rounded-lg p-4 text-sm text-gray-300 leading-relaxed whitespace-pre-wrap font-mono">
+              {biasMut.data.reasoning}
+            </div>
           </div>
         ) : (
           <p className="text-sm text-gray-600 text-center py-8">
-            Click "Generate Bias" to get AI market analysis based on real {range} data
-            <br />
-            <span className="text-xs">Requires ANTHROPIC_API_KEY or OPENAI_API_KEY</span>
+            "Generate Bias" tugmasini bosing — real {range} ma'lumotlari asosida bozor tahlili
           </p>
         )}
       </div>

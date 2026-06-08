@@ -59,6 +59,7 @@ interface Props {
   data: ForecastData;
   overlays: OverlayToggles;
   height?: number;
+  livePrice?: number | null;
 }
 
 const COLORS = {
@@ -96,12 +97,14 @@ function addPriceLine(
   series.createPriceLine({ price, color, lineWidth: width, lineStyle: style, axisLabelVisible: true, title } as PriceLineOptions);
 }
 
-export const ForecastChart = memo(function ForecastChart({ data, overlays, height = 520 }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const rsiRef       = useRef<HTMLDivElement>(null);
-  const chartRef     = useRef<IChartApi | null>(null);
-  const rsiChartRef  = useRef<IChartApi | null>(null);
+export const ForecastChart = memo(function ForecastChart({ data, overlays, height = 520, livePrice }: Props) {
+  const containerRef     = useRef<HTMLDivElement>(null);
+  const rsiRef           = useRef<HTMLDivElement>(null);
+  const chartRef         = useRef<IChartApi | null>(null);
+  const rsiChartRef      = useRef<IChartApi | null>(null);
+  const candleSeriesRef  = useRef<ISeriesApi<"Candlestick"> | null>(null);
 
+  // Full chart rebuild when data or overlays change
   useEffect(() => {
     if (!containerRef.current || !data?.candles?.length) return;
 
@@ -127,6 +130,7 @@ export const ForecastChart = memo(function ForecastChart({ data, overlays, heigh
       wickDownColor:    COLORS.bearish,
     });
     candleSeries.setData(data.candles as any);
+    candleSeriesRef.current = candleSeries;
 
     // Volume
     if (overlays.volume) {
@@ -255,7 +259,6 @@ export const ForecastChart = memo(function ForecastChart({ data, overlays, heigh
       forecastSeries.setData(data.ml_forecast.projection as any);
     }
 
-    // Fit all data to view
     chart.timeScale().fitContent();
 
     // ── RSI sub-chart ──
@@ -273,14 +276,10 @@ export const ForecastChart = memo(function ForecastChart({ data, overlays, heigh
 
       const rsiSeries = rsiChart.addLineSeries({ color: "#a78bfa", lineWidth: 1, priceLineVisible: false });
       rsiSeries.setData(data.indicators.rsi as any);
-
-      // Overbought / Oversold lines
       rsiSeries.createPriceLine({ price: 70, color: COLORS.bearish, lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: "OB" } as PriceLineOptions);
       rsiSeries.createPriceLine({ price: 30, color: COLORS.bullish, lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: "OS" } as PriceLineOptions);
-
       rsiChart.timeScale().fitContent();
 
-      // Sync time ranges
       chart.timeScale().subscribeVisibleTimeRangeChange(range => {
         if (range) rsiChart.timeScale().setVisibleRange(range);
       });
@@ -297,10 +296,28 @@ export const ForecastChart = memo(function ForecastChart({ data, overlays, heigh
       ro.disconnect();
       chart.remove();
       rsiChartRef.current?.remove();
-      rsiChartRef.current = null;
-      chartRef.current    = null;
+      rsiChartRef.current    = null;
+      chartRef.current       = null;
+      candleSeriesRef.current = null;
     };
   }, [data, overlays, height]);
+
+  // Live price update — only updates the last candle, no full rebuild
+  useEffect(() => {
+    if (!livePrice || !candleSeriesRef.current || !data?.candles?.length) return;
+    const last = data.candles[data.candles.length - 1];
+    try {
+      candleSeriesRef.current.update({
+        time:  last.time as Time,
+        open:  last.open,
+        high:  Math.max(last.high, livePrice),
+        low:   Math.min(last.low,  livePrice),
+        close: livePrice,
+      });
+    } catch {
+      // Silently ignore if chart was just destroyed
+    }
+  }, [livePrice]);
 
   return (
     <div className="w-full">

@@ -49,8 +49,8 @@ def _run_backtest(candles: list, window: int) -> Dict[str, Any]:
             continue
 
         entry = sig.get("entry")
-        sl = sig.get("sl")
-        tp2 = sig.get("tp2")
+        sl    = sig.get("stop_loss")
+        tp2   = sig.get("take_profit")
 
         if not entry or not sl or not tp2:
             continue
@@ -111,10 +111,11 @@ def run_backtest(payload: BacktestIn, db: Session = Depends(get_db)) -> Dict[str
     rows = (
         db.query(Candle)
         .filter(Candle.symbol == payload.symbol, Candle.timeframe == str(payload.timeframe))
-        .order_by(Candle.timestamp.asc())
+        .order_by(Candle.timestamp.desc())
         .limit(payload.window + 100)
         .all()
     )
+    rows = list(reversed(rows))
 
     if len(rows) < payload.window + 5:
         raise HTTPException(status_code=422, detail=f"Need at least {payload.window + 5} candles. Only {len(rows)} available.")

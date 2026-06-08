@@ -9,6 +9,7 @@ from src.api.economic_calendar.routes import router as econ_router
 from src.api.indicators.routes import router as indicators_router
 from src.api.market_data.routes import router as market_data_router
 from src.api.ml.routes import router as ml_router
+from src.api.ml_feedback import router as ml_feedback_router
 from src.api.news.routes import router as news_router
 from src.api.patterns.routes import router as patterns_router
 from src.api.realtime.routes import router as realtime_router
@@ -54,6 +55,7 @@ app.include_router(smc_router, prefix="/api/v1/smc", tags=["Smart Money Concepts
 app.include_router(news_router, prefix="/api/v1/news", tags=["News Intelligence"])
 app.include_router(econ_router, prefix="/api/v1/economic-calendar", tags=["Economic Calendar"])
 app.include_router(ml_router, prefix="/api/v1/ml", tags=["Machine Learning"])
+app.include_router(ml_feedback_router, prefix="/api/v1", tags=["ML Feedback"])
 app.include_router(ai_router, prefix="/api/v1/ai", tags=["AI Analysis"])
 
 # Signals + Trading

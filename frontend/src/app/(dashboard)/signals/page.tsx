@@ -8,7 +8,7 @@ import {
   Card, CardHeader, PageHeader, SignalBadge, ScoreBar,
   Select, EmptyState, SkeletonRow,
 } from "@/components/ui";
-import { Zap, RefreshCw } from "lucide-react";
+import { Zap, RefreshCw, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import type { Signal } from "@/types";
 
 const SYMBOLS = [
@@ -74,45 +74,74 @@ export default function SignalsPage() {
       {/* Generated signal result */}
       {latest && (
         <Card className={
-          latest.signal_type === "BUY" ? "border-green-500/30" :
-          latest.signal_type === "SELL" ? "border-red-500/30" :
-          ""
+          latest.signal_type === "BUY"  ? "border-green-500/40" :
+          latest.signal_type === "SELL" ? "border-red-500/40"   : ""
         }>
           <div className="p-5">
-            <div className="flex items-start justify-between mb-4">
+            {/* ── Signal type banner ── */}
+            <div className={`rounded-xl px-5 py-4 mb-5 flex items-center justify-between ${
+              latest.signal_type === "BUY"
+                ? "bg-green-500/10 border border-green-500/30"
+                : latest.signal_type === "SELL"
+                ? "bg-red-500/10 border border-red-500/30"
+                : "bg-gray-500/10 border border-gray-500/20"
+            }`}>
               <div className="flex items-center gap-3">
-                <SignalBadge type={latest.signal_type} />
+                {latest.signal_type === "BUY"  && <TrendingUp  className="w-7 h-7 text-green-400" />}
+                {latest.signal_type === "SELL" && <TrendingDown className="w-7 h-7 text-red-400"   />}
+                {latest.signal_type === "NO TRADE" && <Minus   className="w-7 h-7 text-gray-400"   />}
                 <div>
-                  <p className="text-[13px] font-semibold" style={{ color: "var(--text)" }}>
-                    {latest.symbol} · {latest.timeframe}m
+                  <p className={`text-2xl font-black tracking-wide ${
+                    latest.signal_type === "BUY"  ? "text-green-400" :
+                    latest.signal_type === "SELL" ? "text-red-400"   : "text-gray-400"
+                  }`}>
+                    {latest.signal_type}
                   </p>
-                  <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                    Confidence: {latest.confidence?.toFixed(1)}%
+                  <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>
+                    {latest.symbol} · {latest.timeframe === "60" ? "H1" : latest.timeframe === "240" ? "H4" : `${latest.timeframe}m`}
                   </p>
                 </div>
               </div>
-              <p className="text-[11px]" style={{ color: "var(--text-faint)" }}>
-                {new Date().toLocaleTimeString()}
-              </p>
+              <div className="text-right">
+                <p className={`text-xl font-bold font-mono ${
+                  latest.confidence > 70 ? "text-green-400" :
+                  latest.confidence > 50 ? "text-yellow-400" : "text-red-400"
+                }`}>
+                  {latest.confidence?.toFixed(1)}%
+                </p>
+                <p className="text-[11px]" style={{ color: "var(--text-faint)" }}>
+                  confidence
+                </p>
+              </div>
             </div>
 
             {/* Trade plan */}
-            <div className="grid grid-cols-4 gap-3 mb-5">
-              {[
-                { label: "Entry",       value: formatPrice(latest.entry, 2),       color: "text-white" },
-                { label: "Stop Loss",   value: formatPrice(latest.stop_loss, 2),   color: "text-red-400" },
-                { label: "Take Profit", value: formatPrice(latest.take_profit, 2), color: "text-green-400" },
-                { label: "Risk/Reward", value: latest.risk_reward ? `${latest.risk_reward?.toFixed(2)} R` : "—", color: "text-[var(--gold)]" },
-              ].map(f => (
-                <div key={f.label}
-                  className="rounded-lg p-3 text-center"
-                  style={{ background: "var(--surface-2)" }}
-                >
-                  <p className="text-[10px] mb-1" style={{ color: "var(--text-muted)" }}>{f.label}</p>
-                  <p className={`text-base font-bold font-mono ${f.color}`}>{f.value}</p>
-                </div>
-              ))}
-            </div>
+            {latest.signal_type !== "NO TRADE" ? (
+              <div className="grid grid-cols-4 gap-3 mb-5">
+                {[
+                  { label: "Entry",       value: formatPrice(latest.entry, 2),       color: "text-white" },
+                  { label: "Stop Loss",   value: formatPrice(latest.stop_loss, 2),   color: "text-red-400" },
+                  { label: "Take Profit", value: formatPrice(latest.take_profit, 2), color: "text-green-400" },
+                  { label: "Risk/Reward", value: latest.risk_reward ? `${latest.risk_reward?.toFixed(2)} R` : "—", color: "text-[var(--gold)]" },
+                ].map(f => (
+                  <div key={f.label}
+                    className="rounded-lg p-3 text-center"
+                    style={{ background: "var(--surface-2)" }}
+                  >
+                    <p className="text-[10px] mb-1" style={{ color: "var(--text-muted)" }}>{f.label}</p>
+                    <p className={`text-base font-bold font-mono ${f.color}`}>{f.value}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg px-4 py-3 mb-5 text-center"
+                style={{ background: "var(--surface-2)", color: "var(--text-muted)" }}>
+                <p className="text-sm">Bozor yo'nalishi aniq emas — hozircha savdo ochish tavsiya etilmaydi.</p>
+                <p className="text-xs mt-1" style={{ color: "var(--text-faint)" }}>
+                  Multi-timeframe tahlillar orasida ziddiyat aniqlandi.
+                </p>
+              </div>
+            )}
 
             {/* Score breakdown */}
             <div className="space-y-2 mb-4">
@@ -170,8 +199,25 @@ export default function SignalsPage() {
               </thead>
               <tbody>
                 {signals.map((s: Signal) => (
-                  <tr key={s.id}>
-                    <td><SignalBadge type={s.signal_type} /></td>
+                  <tr key={s.id} className={
+                    s.signal_type === "BUY"  ? "bg-green-500/5 hover:bg-green-500/10" :
+                    s.signal_type === "SELL" ? "bg-red-500/5 hover:bg-red-500/10"     :
+                    "hover:bg-[var(--surface-2)]"
+                  }>
+                    <td>
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-sm font-black tracking-wide ${
+                        s.signal_type === "BUY"
+                          ? "bg-green-500/15 text-green-400 border border-green-500/30"
+                          : s.signal_type === "SELL"
+                          ? "bg-red-500/15 text-red-400 border border-red-500/30"
+                          : "bg-gray-500/10 text-gray-400 border border-gray-500/20"
+                      }`}>
+                        {s.signal_type === "BUY"  && <TrendingUp  className="w-3.5 h-3.5" />}
+                        {s.signal_type === "SELL" && <TrendingDown className="w-3.5 h-3.5" />}
+                        {s.signal_type === "NO TRADE" && <Minus   className="w-3.5 h-3.5" />}
+                        {s.signal_type}
+                      </span>
+                    </td>
                     <td className="font-mono text-xs" style={{ color: "var(--text-muted)" }}>
                       {s.symbol} {s.timeframe}m
                     </td>

@@ -22,6 +22,14 @@ def _create_tables() -> None:
     import models.ml_model
     import models.system_log
     Base.metadata.create_all(bind=engine)
+
+    try:
+        from src.machine_learning.feedback_models import Base as FeedbackBase
+        FeedbackBase.metadata.create_all(bind=engine)
+        log.info("ML feedback tables created/verified")
+    except Exception as exc:
+        log.warning("ML feedback tables skipped: %s", exc)
+
     log.info("Database tables created/verified")
 
 
@@ -131,6 +139,7 @@ from routers.backtesting import router as backtesting_router
 from routers.admin import router as admin_router
 from routers.forecast import router as forecast_router
 from routers.telegram_service import router as telegram_router
+from src.api.ml_feedback import router as ml_feedback_router
 
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(market_data_router, prefix="/api/v1/market-data", tags=["Market Data"])
@@ -146,6 +155,7 @@ app.include_router(backtesting_router, prefix="/api/v1/backtesting", tags=["Back
 app.include_router(admin_router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(forecast_router, prefix="/api/v1/forecast", tags=["Forecast"])
 app.include_router(telegram_router, prefix="/api/v1/telegram", tags=["Telegram"])
+app.include_router(ml_feedback_router, prefix="/api/v1", tags=["ML Feedback"])
 
 
 @app.get("/api/v1/health", tags=["Health"])

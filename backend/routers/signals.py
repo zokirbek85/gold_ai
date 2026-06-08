@@ -10,8 +10,8 @@ from models.candle import Candle
 from models.signal import Signal
 from services.signal_service import generate_signal
 from services.market_service import fetch_and_store
-from services.news_service import get_sentiment_summary
-from services.calendar_service import get_aggregate_score
+from services.news_service import get_sentiment_summary, refresh_news
+from services.calendar_service import get_aggregate_score, refresh_calendar
 from services.telegram_service import alert_signal
 from src.signals.scorer import signal_scorer
 
@@ -56,12 +56,14 @@ def _load_candles(db: Session, symbol: str, timeframe: str, limit: int = 300) ->
     rows = (
         db.query(Candle)
         .filter(Candle.symbol == symbol, Candle.timeframe == str(timeframe))
-        .order_by(Candle.timestamp.asc())
+        .order_by(Candle.timestamp.desc())
         .limit(limit)
         .all()
     )
+    rows = list(reversed(rows))
     return [{"open": r.open, "high": r.high, "low": r.low,
-             "close": r.close, "volume": r.volume} for r in rows]
+             "close": r.close, "volume": r.volume, "timestamp": r.timestamp}
+            for r in rows]
 
 
 def _apply_confluence(
@@ -93,6 +95,10 @@ def _apply_confluence(
         if composite < 70 and result.get("signal_type") != "NO TRADE":
             result["signal_type"] = "NO TRADE"
             result["direction"]   = "neutral"
+            result["stop_loss"]   = None
+            result["take_profit"] = None
+            result["tp1"]         = None
+            result["risk_reward"] = None
 
     result["composite_score"] = round(composite, 1)
     result["confluence"]      = confluence
@@ -104,16 +110,30 @@ def generate(
     payload: GenerateSignalIn,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    fetch_and_store(db, payload.symbol, payload.timeframe, limit=300)
+    # Fetch fresh candles from Twelvedata and upsert; use result directly (not re-query)
+    fresh_rows = fetch_and_store(db, payload.symbol, payload.timeframe, limit=300)
+    candles = [
+        {"open": r.open, "high": r.high, "low": r.low,
+         "close": r.close, "volume": r.volume, "timestamp": r.timestamp}
+        for r in fresh_rows
+    ]
 
-    candles = _load_candles(db, payload.symbol, payload.timeframe)
     if len(candles) < 50:
         raise HTTPException(
             status_code=422,
             detail="Insufficient candle data. Try again after data ingestion completes.",
         )
 
-    # Fetch external scores from DB cache
+    # Refresh news and economic calendar before scoring so sentiment is current
+    try:
+        refresh_news(db)
+    except Exception:
+        pass
+    try:
+        refresh_calendar(db)
+    except Exception:
+        pass
+
     news_data  = get_sentiment_summary(db, hours=24)
     econ_data  = get_aggregate_score(db, hours=48)
     news_score = float(news_data.get("score", 50.0))
@@ -136,8 +156,10 @@ def generate(
     )
 
     # ── Multi-timeframe confluence ──────────────────────────────────────────
-    # Fetch candles for trend (H4), primary (H1), and confirm (M15) timeframes.
-    # These may overlap with the primary timeframe — that's intentional.
+    # Fetch and refresh confluence timeframes too, then re-query with correct order
+    fetch_and_store(db, payload.symbol, payload.timeframe_trend,   limit=300)
+    fetch_and_store(db, payload.symbol, payload.timeframe_confirm, limit=300)
+
     candles_trend   = _load_candles(db, payload.symbol, payload.timeframe_trend)
     candles_primary = _load_candles(db, payload.symbol, payload.timeframe_primary)
     candles_confirm = _load_candles(db, payload.symbol, payload.timeframe_confirm)

@@ -235,6 +235,25 @@ def analyze(candles: list) -> Dict[str, Any]:
     liq = detect_liquidity_zones(candles)
     score_data = score(candles)
 
+    # market_structure = BOS events + liquidity zones in a unified list
+    market_structure = []
+    for b in bos:
+        market_structure.append({
+            "type": "BOS",
+            "direction": b.get("direction", "neutral"),
+            "description": b.get("description", ""),
+            "level": b.get("level"),
+        })
+    for lz in liq:
+        direction = "bearish" if lz.get("type") == "sell_side" else (
+                    "bullish" if lz.get("type") == "buy_side" else "neutral")
+        market_structure.append({
+            "type": "Liquidity",
+            "direction": direction,
+            "description": lz.get("description", ""),
+            "level": lz.get("level"),
+        })
+
     return {
         "direction": score_data["direction"],
         "bias": score_data["direction"],
@@ -242,6 +261,7 @@ def analyze(candles: list) -> Dict[str, Any]:
         "fvg": fvg,
         "liquidity_zones": liq,
         "bos": bos,
+        "market_structure": market_structure,
     }
 
 

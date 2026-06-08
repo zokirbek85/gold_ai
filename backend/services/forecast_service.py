@@ -295,10 +295,11 @@ def generate_forecast(db: Session, symbol: str, timeframe: str) -> Dict[str, Any
     rows = (
         db.query(Candle)
         .filter(Candle.symbol == symbol, Candle.timeframe == str(timeframe))
-        .order_by(Candle.timestamp.asc())
+        .order_by(Candle.timestamp.desc())
         .limit(300)
         .all()
     )
+    rows = list(reversed(rows))
     if not rows:
         return {"error": "No candle data available"}
 

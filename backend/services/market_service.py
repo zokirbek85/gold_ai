@@ -210,36 +210,39 @@ def fetch_candles_by_range(symbol: str, range_key: str) -> Tuple[List[Dict[str, 
 
 def upsert_candles(db, symbol: str, timeframe: str, rows: List[Dict[str, Any]]) -> int:
     from models.candle import Candle
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
     if not rows:
         return 0
-    count = 0
-    for row in rows:
-        existing = (
-            db.query(Candle)
-            .filter(
-                Candle.symbol == symbol,
-                Candle.timeframe == str(timeframe),
-                Candle.timestamp == row["timestamp"],
-            )
-            .first()
-        )
-        if existing:
-            existing.open  = row["open"]
-            existing.high  = row["high"]
-            existing.low   = row["low"]
-            existing.close = row["close"]
-            existing.volume = row["volume"]
-        else:
-            db.add(Candle(
-                symbol=symbol, timeframe=str(timeframe),
-                timestamp=row["timestamp"],
-                open=row["open"], high=row["high"],
-                low=row["low"],  close=row["close"],
-                volume=row["volume"],
-            ))
-            count += 1
+
+    values = [
+        {
+            "symbol":    symbol,
+            "timeframe": str(timeframe),
+            "timestamp": row["timestamp"],
+            "open":      row["open"],
+            "high":      row["high"],
+            "low":       row["low"],
+            "close":     row["close"],
+            "volume":    row["volume"],
+        }
+        for row in rows
+    ]
+
+    stmt = pg_insert(Candle).values(values)
+    stmt = stmt.on_conflict_do_update(
+        constraint="uq_candle_symbol_tf_ts",
+        set_={
+            "open":   stmt.excluded.open,
+            "high":   stmt.excluded.high,
+            "low":    stmt.excluded.low,
+            "close":  stmt.excluded.close,
+            "volume": stmt.excluded.volume,
+        },
+    )
+    db.execute(stmt)
     db.commit()
-    return count
+    return len(values)
 
 
 def fetch_and_store(db, symbol: str, timeframe: str, limit: int = 200) -> List[Any]:
@@ -260,25 +263,36 @@ def fetch_and_store(db, symbol: str, timeframe: str, limit: int = 200) -> List[A
 
 
 def fetch_and_store_by_range(db, symbol: str, range_key: str) -> Tuple[List[Dict], str]:
-    """Fetch fresh real candles by range, upsert them, and return the fetched rows."""
-    rows, timeframe = fetch_candles_by_range(symbol, range_key)
-    if not rows:
-        return [], timeframe
+    """Fetch fresh real candles by range, upsert them, and return the fetched rows.
+    Falls back to DB data when Twelvedata is unavailable or rate-limited."""
+    from models.candle import Candle
 
-    upsert_candles(db, symbol, timeframe, rows)
-    result = [
-        {
-            "id": 0,
-            "timestamp": r["timestamp"],
-            "open": r["open"],
-            "high": r["high"],
-            "low": r["low"],
-            "close": r["close"],
-            "volume": r["volume"],
-        }
-        for r in rows
-    ]
-    return result, timeframe
+    rows, timeframe = fetch_candles_by_range(symbol, range_key)
+    if rows:
+        upsert_candles(db, symbol, timeframe, rows)
+        return [
+            {"id": 0, "timestamp": r["timestamp"],
+             "open": r["open"], "high": r["high"],
+             "low": r["low"], "close": r["close"], "volume": r["volume"]}
+            for r in rows
+        ], timeframe
+
+    # Twelvedata returned nothing — fall back to DB
+    cfg = RANGE_CONFIG.get(range_key.lower())
+    if cfg:
+        _, tf_str, limit = cfg
+        db_rows = (
+            db.query(Candle)
+            .filter(Candle.symbol == symbol, Candle.timeframe == tf_str)
+            .order_by(Candle.timestamp.desc())
+            .limit(limit)
+            .all()
+        )
+        if db_rows:
+            db_rows = list(reversed(db_rows))
+            return _candles_as_dicts(db_rows), tf_str
+
+    return [], timeframe
 
 
 def _candles_as_dicts(rows) -> List[Dict]:

@@ -47,6 +47,7 @@ class MLTrainer:
 
         X = []
         y = []
+        weights: List[float] = []
         feature_names: Optional[List[str]] = None
 
         for row in dataset:
@@ -55,6 +56,7 @@ class MLTrainer:
                 feature_names = list(feats.keys())
             X.append([feats.get(f, 0.0) for f in feature_names])
             y.append(row["label"])
+            weights.append(float(row.get("weight", 1.0)))
 
         _ensure_dir()
         version = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
@@ -62,7 +64,7 @@ class MLTrainer:
         metrics: Dict[str, Any] = {}
 
         for model_type in ["xgboost", "lightgbm", "catboost"]:
-            model, model_metrics = self._train_single(model_type, X, y)
+            model, model_metrics = self._train_single(model_type, X, y, weights)
             if model is not None:
                 path = os.path.join(MODEL_DIR, f"{model_name}_{model_type}_{version}.pkl")
                 with open(path, "wb") as f:
@@ -92,26 +94,29 @@ class MLTrainer:
         }
 
     def _train_single(
-        self, model_type: str, X: List[List[float]], y: List[int]
+        self, model_type: str, X: List[List[float]], y: List[int],
+        weights: Optional[List[float]] = None,
     ) -> Tuple[Any, Dict[str, float]]:
         split = int(len(X) * 0.8)
         X_train, X_test = X[:split], X[split:]
         y_train, y_test = y[:split], y[split:]
+        w_train = weights[:split] if weights else None
 
         model = None
         try:
             if model_type == "xgboost":
                 from xgboost import XGBClassifier
-                model = XGBClassifier(n_estimators=100, max_depth=5, learning_rate=0.1, use_label_encoder=False, eval_metric="mlogloss", verbosity=0)
-                model.fit(X_train, y_train)
+                model = XGBClassifier(n_estimators=100, max_depth=5, learning_rate=0.1,
+                                      use_label_encoder=False, eval_metric="mlogloss", verbosity=0)
+                model.fit(X_train, y_train, sample_weight=w_train)
             elif model_type == "lightgbm":
                 from lightgbm import LGBMClassifier
                 model = LGBMClassifier(n_estimators=100, max_depth=5, learning_rate=0.1, verbose=-1)
-                model.fit(X_train, y_train)
+                model.fit(X_train, y_train, sample_weight=w_train)
             elif model_type == "catboost":
                 from catboost import CatBoostClassifier
                 model = CatBoostClassifier(iterations=100, depth=5, learning_rate=0.1, verbose=0)
-                model.fit(X_train, y_train)
+                model.fit(X_train, y_train, sample_weight=w_train)
         except ImportError:
             log.warning("%s not installed — skipping", model_type)
             return None, {}

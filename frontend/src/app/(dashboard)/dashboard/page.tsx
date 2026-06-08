@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { adminApi, signalApi, newsApi, econApi } from "@/lib/api";
 import { formatPrice, signalColor, directionColor } from "@/lib/utils";
-import { Activity, Zap, Newspaper, BarChart3, Database, TrendingUp } from "lucide-react";
+import { Activity, Zap, Newspaper, BarChart3, Database, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import {
   Card, CardHeader, PageHeader, StatCard, SignalBadge,
   DirectionBadge, ImpactBadge, ScoreBar, SkeletonCard, SkeletonRow, EmptyState,
@@ -90,13 +90,25 @@ export default function DashboardPage() {
                 {signals.map((s: any) => (
                   <div
                     key={s.id}
-                    className="flex items-center justify-between px-2 py-2 rounded-lg transition-colors"
-                    style={{ background: "transparent" }}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--surface-2)"}
-                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
+                    className={`flex items-center justify-between px-3 py-2.5 rounded-lg transition-colors ${
+                      s.signal_type === "BUY"  ? "bg-green-500/8 hover:bg-green-500/15" :
+                      s.signal_type === "SELL" ? "bg-red-500/8 hover:bg-red-500/15"     :
+                      "hover:bg-[var(--surface-2)]"
+                    }`}
                   >
                     <div className="flex items-center gap-2.5">
-                      <SignalBadge type={s.signal_type} />
+                      <span className={`inline-flex items-center gap-1.5 text-sm font-black px-2.5 py-1 rounded-lg ${
+                        s.signal_type === "BUY"
+                          ? "text-green-400 bg-green-500/15 border border-green-500/25"
+                          : s.signal_type === "SELL"
+                          ? "text-red-400 bg-red-500/15 border border-red-500/25"
+                          : "text-gray-400 bg-gray-500/10 border border-gray-500/20"
+                      }`}>
+                        {s.signal_type === "BUY"      && <TrendingUp   className="w-3.5 h-3.5" />}
+                        {s.signal_type === "SELL"     && <TrendingDown  className="w-3.5 h-3.5" />}
+                        {s.signal_type === "NO TRADE" && <Minus         className="w-3.5 h-3.5" />}
+                        {s.signal_type}
+                      </span>
                       <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                         {s.symbol} · {s.timeframe}m
                       </span>

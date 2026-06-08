@@ -181,8 +181,36 @@ def ingest_candles(db: Session, symbol: str, timeframe: int) -> None:
 
     db.commit()
 
+    # ── Realtime ML pipeline ─────────────────────────────────────────────────
+    from src.database import models as _m
+    recent_rows = (
+        db.query(_m.Candle)
+        .filter(_m.Candle.symbol == symbol, _m.Candle.timeframe == str(timeframe))
+        .order_by(_m.Candle.timestamp.asc())
+        .limit(300)
+        .all()
+    )
+    if len(recent_rows) >= 30:
+        candles_dicts = [
+            {"open": r.open, "high": r.high, "low": r.low, "close": r.close,
+             "volume": r.volume, "timestamp": r.timestamp}
+            for r in recent_rows
+        ]
+
+        try:
+            from src.machine_learning.realtime_predictor import realtime_predictor
+            realtime_predictor.on_new_candle(db, symbol, str(timeframe), candles_dicts)
+        except Exception:
+            log.exception("RealtimePredictor xatosi [%s %s]", symbol, timeframe)
+
+        try:
+            from src.machine_learning.incremental_trainer import incremental_trainer
+            incremental_trainer.notify_new_candle(symbol, str(timeframe))
+            incremental_trainer.maybe_retrain(db, symbol, str(timeframe), candles_dicts)
+        except Exception:
+            log.exception("IncrementalTrainer xatosi [%s %s]", symbol, timeframe)
+
     # After a successful ingestion batch, check if ML auto-training is due.
-    # _maybe_auto_train gates itself to at most once every 6 hours.
     _maybe_auto_train(db, symbol, str(timeframe))
 
 

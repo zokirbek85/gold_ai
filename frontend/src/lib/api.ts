@@ -112,8 +112,8 @@ export const forecastApi = {
 export const aiApi = {
   analyzeSignal: (signal_id: number) =>
     api.post("/ai/analyze-signal", { signal_id }),
-  dailyBias: (candle_summary = "", news_summary = "", econ_summary = "") =>
-    api.post("/ai/daily-bias", { candle_summary, news_summary, econ_summary }),
+  dailyBias: (candle_summary = "", news_summary = "", econ_summary = "", snapshot?: Record<string, unknown>) =>
+    api.post("/ai/daily-bias", { candle_summary, news_summary, econ_summary, snapshot }),
 };
 
 export const backtestApi = {

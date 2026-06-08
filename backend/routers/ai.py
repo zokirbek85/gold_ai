@@ -24,16 +24,18 @@ class DailyBiasIn(BaseModel):
     candle_summary: str = ""
     news_summary: str = ""
     econ_summary: str = ""
+    snapshot: Optional[Dict[str, Any]] = None
 
 
 def _load_candles(db: Session, symbol: str, timeframe: str) -> list:
     rows = (
         db.query(Candle)
         .filter(Candle.symbol == symbol, Candle.timeframe == str(timeframe))
-        .order_by(Candle.timestamp.asc())
+        .order_by(Candle.timestamp.desc())
         .limit(200)
         .all()
     )
+    rows = list(reversed(rows))
     return [{"open": r.open, "high": r.high, "low": r.low, "close": r.close, "volume": r.volume} for r in rows]
 
 
@@ -123,39 +125,108 @@ def analyze_signal(payload: AnalyzeSignalIn, db: Session = Depends(get_db)) -> D
 
 @router.post("/daily-bias")
 def daily_bias(payload: DailyBiasIn) -> Dict[str, Any]:
-    candle_summary = payload.candle_summary or "price is consolidating"
-    news_summary = payload.news_summary or "mixed news sentiment"
-    econ_summary = payload.econ_summary or "upcoming high-impact events"
+    snap = payload.snapshot or {}
+    signals: List[Dict[str, Any]] = []
 
-    bullish_signals = sum(
-        1 for word in ["bullish", "above", "rising", "broke above", "uptrend", "buy"]
-        if word in (candle_summary + news_summary + econ_summary).lower()
-    )
-    bearish_signals = sum(
-        1 for word in ["bearish", "below", "falling", "broke below", "downtrend", "sell"]
-        if word in (candle_summary + news_summary + econ_summary).lower()
-    )
+    rsi = snap.get("rsi")
+    if rsi is not None:
+        if rsi > 70:
+            signals.append({"direction": "bearish", "weight": 2,
+                             "text": f"RSI {rsi:.1f} — overbought (>70), bearish reversal ehtimoli"})
+        elif rsi < 30:
+            signals.append({"direction": "bullish", "weight": 2,
+                             "text": f"RSI {rsi:.1f} — oversold (<30), bullish reversal ehtimoli"})
+        elif rsi > 55:
+            signals.append({"direction": "bullish", "weight": 1,
+                             "text": f"RSI {rsi:.1f} — bullish zone (50-70)"})
+        elif rsi < 45:
+            signals.append({"direction": "bearish", "weight": 1,
+                             "text": f"RSI {rsi:.1f} — bearish zone (30-50)"})
 
-    if bullish_signals > bearish_signals:
-        direction = "bullish"
-        bias = "LONG"
-        confidence = min(60 + bullish_signals * 5, 85)
-        reasoning = f"Analysis of candle structure ({candle_summary}), news ({news_summary}), and economics ({econ_summary}) shows bullish momentum."
-    elif bearish_signals > bullish_signals:
-        direction = "bearish"
-        bias = "SHORT"
-        confidence = min(60 + bearish_signals * 5, 85)
-        reasoning = f"Analysis of candle structure ({candle_summary}), news ({news_summary}), and economics ({econ_summary}) shows bearish pressure."
+    macd = snap.get("macd")
+    macd_sig = snap.get("macd_signal")
+    if macd is not None and macd_sig is not None:
+        if macd > macd_sig:
+            signals.append({"direction": "bullish", "weight": 2,
+                             "text": f"MACD ({macd:.4f}) > Signal ({macd_sig:.4f}) — bullish momentum"})
+        else:
+            signals.append({"direction": "bearish", "weight": 2,
+                             "text": f"MACD ({macd:.4f}) < Signal ({macd_sig:.4f}) — bearish momentum"})
+
+    ema_200 = snap.get("ema_200")
+    ema_50  = snap.get("ema_50")
+    ema_20  = snap.get("ema_20")
+    bb_mid  = snap.get("bb_mid")
+    if bb_mid and ema_200:
+        price = bb_mid
+        if price > ema_200:
+            signals.append({"direction": "bullish", "weight": 2,
+                             "text": f"Narx EMA200 ({ema_200:.2f}) dan yuqorida — uzoq muddatli bullish trend"})
+        else:
+            signals.append({"direction": "bearish", "weight": 2,
+                             "text": f"Narx EMA200 ({ema_200:.2f}) dan pastda — uzoq muddatli bearish trend"})
+        if ema_20 and ema_50:
+            if ema_20 > ema_50:
+                signals.append({"direction": "bullish", "weight": 1,
+                                 "text": f"EMA20 ({ema_20:.2f}) > EMA50 ({ema_50:.2f}) — qisqa muddatli bullish"})
+            else:
+                signals.append({"direction": "bearish", "weight": 1,
+                                 "text": f"EMA20 ({ema_20:.2f}) < EMA50 ({ema_50:.2f}) — qisqa muddatli bearish"})
+
+    bb_upper = snap.get("bb_upper")
+    bb_lower = snap.get("bb_lower")
+    if bb_mid and bb_upper and bb_lower:
+        price = bb_mid
+        bb_range = bb_upper - bb_lower
+        if bb_range > 0:
+            pos = (price - bb_lower) / bb_range
+            if pos > 0.85:
+                signals.append({"direction": "bearish", "weight": 1,
+                                 "text": f"Narx Bollinger yuqori bantiga yaqin ({pos*100:.0f}%) — qisqarish ehtimoli"})
+            elif pos < 0.15:
+                signals.append({"direction": "bullish", "weight": 1,
+                                 "text": f"Narx Bollinger quyi bantiga yaqin ({pos*100:.0f}%) — ko'tarilish ehtimoli"})
+
+    atr = snap.get("atr")
+    atr_text = f"ATR: {atr:.4f}" if atr else ""
+
+    bull_score = sum(s["weight"] for s in signals if s["direction"] == "bullish")
+    bear_score = sum(s["weight"] for s in signals if s["direction"] == "bearish")
+    total = bull_score + bear_score or 1
+
+    if bull_score > bear_score:
+        direction  = "bullish"
+        bias       = "LONG"
+        confidence = min(50 + int((bull_score / total) * 40), 88)
+    elif bear_score > bull_score:
+        direction  = "bearish"
+        bias       = "SHORT"
+        confidence = min(50 + int((bear_score / total) * 40), 88)
     else:
-        direction = "neutral"
-        bias = "NEUTRAL"
+        direction  = "neutral"
+        bias       = "NEUTRAL"
         confidence = 45
-        reasoning = f"Mixed signals from candle structure ({candle_summary}), news ({news_summary}), and economics ({econ_summary}). Wait for clarity."
+
+    bullish_points = [s["text"] for s in signals if s["direction"] == "bullish"]
+    bearish_points = [s["text"] for s in signals if s["direction"] == "bearish"]
+
+    reasoning_parts = []
+    if bullish_points:
+        reasoning_parts.append("📈 Bullish omillar:\n" + "\n".join(f"  • {t}" for t in bullish_points))
+    if bearish_points:
+        reasoning_parts.append("📉 Bearish omillar:\n" + "\n".join(f"  • {t}" for t in bearish_points))
+    if atr_text:
+        reasoning_parts.append(f"📊 Volatillik: {atr_text}")
+
+    reasoning = "\n\n".join(reasoning_parts) or "Indikator ma'lumotlari yetarli emas."
 
     return {
-        "bias": bias,
-        "direction": direction,
-        "confidence": confidence,
-        "reasoning": reasoning,
-        "key_levels": [],
+        "bias":          bias,
+        "direction":     direction,
+        "confidence":    confidence,
+        "reasoning":     reasoning,
+        "bull_score":    bull_score,
+        "bear_score":    bear_score,
+        "signals":       signals,
+        "key_levels":    [],
     }

@@ -201,6 +201,8 @@ _REFRESH_PRICE  = [("🔄 Yangilash", "price"),  ("📊 Signal",  "signal")]
 _REFRESH_NEWS   = [("🔄 Yangilash", "news"),   ("🔍 Tahlil",  "analysis")]
 _SIGNAL_ACTIONS = [("🔄 Yangi Signal", "signal")]
 _AFTER_SIGNAL   = [("💰 Narx", "price"),       ("📰 Yangilik", "news")]
+_ML_ACTIONS     = [("🔄 Yangilash", "ml"),     ("📈 Aniqlik",  "accuracy")]
+_ML_EXTRA       = [("⚠️ Patternlar", "patterns"), ("🔁 Retrain", "retrain")]
 
 
 def send(chat_id: str, text: str, buttons=None) -> bool:
@@ -245,6 +247,7 @@ def _handle_start(chat_id: str) -> None:
     kb = _kb(
         [("💰 Narx", "price"),    ("📊 Signal",   "signal")],
         [("📰 Yangilik", "news"), ("🔍 Tahlil",   "analysis")],
+        [("🤖 ML Tahlil", "ml"),  ("📈 Aniqlik",  "accuracy")],
         [("⚙️ Holat", "status"),  ("❓ Yordam",   "help")],
     )
     send(chat_id,
@@ -259,6 +262,7 @@ def _handle_menu(chat_id: str) -> None:
     kb = _kb(
         [("💰 Narx", "price"),    ("📊 Signal",   "signal")],
         [("📰 Yangilik", "news"), ("🔍 Tahlil",   "analysis")],
+        [("🤖 ML Tahlil", "ml"),  ("📈 Aniqlik",  "accuracy")],
         [("⚙️ Holat", "status"),  ("❓ Yordam",   "help")],
     )
     send(chat_id, "🏠 *Bosh Menyu* — kerakli bo'limni tanlang:", buttons=kb)
@@ -267,7 +271,8 @@ def _handle_menu(chat_id: str) -> None:
 def _handle_help(chat_id: str) -> None:
     kb = _kb(
         [("💰 Narx", "price"),    ("📊 Signal", "signal")],
-        [("📰 Yangilik", "news"), ("🔍 Tahlil", "analysis")],
+        [("🤖 ML Tahlil", "ml"),  ("📈 Aniqlik", "accuracy")],
+        [("⚠️ Patternlar", "patterns"), ("🔁 Retrain", "retrain")],
         [("🏠 Bosh Menyu", "menu")],
     )
     send(chat_id,
@@ -277,6 +282,10 @@ def _handle_help(chat_id: str) -> None:
          "/signal — Yangi signal\n"
          "/news — So'nggi yangiliklar\n"
          "/analysis — TA + SMC tahlil\n"
+         "/ml — ML prediction va model holati\n"
+         "/accuracy — ML aniqlik statistikasi\n"
+         "/patterns — Xato pattern tahlili\n"
+         "/retrain — Modelni qo'lda yangilash\n"
          "/status — Tizim holati",
          buttons=kb)
 
@@ -379,6 +388,207 @@ def _handle_analysis(chat_id: str) -> None:
         send(chat_id, f"⚠️ Tahlil xatosi: {exc}", buttons=_kb(_MENU_ROW))
 
 
+def _handle_ml(chat_id: str) -> None:
+    """So'nggi ML prediction va model holati."""
+    send(chat_id, "⏳ ML prediction yuklanmoqda...")
+    try:
+        r = httpx.post(
+            "http://localhost:8001/api/v1/ml/predict",
+            json={"symbol": "XAUUSD", "timeframe": "60"},
+            timeout=20,
+        )
+        d = r.json() if r.status_code == 200 else {}
+
+        direction   = d.get("direction", "—")
+        buy_pct     = d.get("buy_pct") or d.get("probabilities", {}).get("bullish", 0)
+        sell_pct    = d.get("sell_pct") or d.get("probabilities", {}).get("bearish", 0)
+        neutral_pct = d.get("neutral_pct") or d.get("probabilities", {}).get("neutral", 0)
+        score       = d.get("score") or d.get("confidence", 0)
+        models_used = d.get("models_used", d.get("models_count", 0))
+        available   = d.get("model_available", d.get("status") == "ok")
+
+        dir_em = "🟢" if direction == "bullish" else ("🔴" if direction == "bearish" else "⚪")
+
+        def _bar(v):
+            v = float(v or 0)
+            filled = round(v / 10)
+            return "█" * filled + "░" * (10 - filled)
+
+        status_txt = "✅ Tayyor" if available else "⚠️ Model o'qitilmagan"
+
+        # Tarix oxirgisini ham ko'rsatamiz
+        hist_r = httpx.get(
+            "http://localhost:8001/api/v1/ml/feedback/history",
+            params={"symbol": "XAUUSD", "timeframe": "60", "limit": 3},
+            timeout=10,
+        )
+        hist_rows = hist_r.json().get("results", []) if hist_r.status_code == 200 else []
+
+        lines = [
+            f"🤖 *ML Prediction — XAUUSD H1*\n",
+            f"*Joriy Prediction*",
+            f"Yo'nalish: {dir_em} *{direction.upper()}*",
+            f"Score:     `{float(score or 0):.1f}%`",
+            f"Modellar:  `{models_used}` ta",
+            f"Holat:     `{status_txt}`\n",
+            f"*Ehtimollik*",
+            f"`BUY  {_bar(buy_pct)} {float(buy_pct or 0):.1f}%`",
+            f"`SELL {_bar(sell_pct)} {float(sell_pct or 0):.1f}%`",
+            f"`NEUT {_bar(neutral_pct)} {float(neutral_pct or 0):.1f}%`",
+        ]
+
+        if hist_rows:
+            lines.append("\n*Oxirgi natijalar*")
+            for row in hist_rows:
+                ok_em  = "✅" if row.get("was_correct") else "❌"
+                pred   = row.get("predicted_dir", "?")
+                actual = row.get("actual_dir", "?")
+                chg    = row.get("price_change_pct", 0) or 0
+                lines.append(f"{ok_em} {pred} → {actual} `{chg:+.2f}%`")
+
+        lines.append(f"\n_{datetime.utcnow().strftime('%H:%M UTC')}_")
+
+        kb = _kb(_ML_ACTIONS, _ML_EXTRA, _MENU_ROW)
+        send(chat_id, "\n".join(lines), buttons=kb)
+
+    except Exception as exc:
+        send(chat_id, f"⚠️ ML xatosi: {exc}", buttons=_kb(_MENU_ROW))
+
+
+def _handle_accuracy(chat_id: str) -> None:
+    """ML aniqlik statistikasi — session bo'yicha."""
+    try:
+        r = httpx.get(
+            "http://localhost:8001/api/v1/ml/feedback/accuracy",
+            params={"symbol": "XAUUSD", "timeframe": "60", "last_n": 100},
+            timeout=10,
+        )
+        d = r.json() if r.status_code == 200 else {}
+
+        acc = d.get("accuracy")
+        if acc is None:
+            send(chat_id,
+                 "📊 *ML Aniqlik*\n\nHali yetarli prediction natijasi yo'q.\n"
+                 "Tizim candle ma'lumotlarini to'plagandan keyin avtomatik hisoblaydi.",
+                 buttons=_kb([("🔄 Yangilash", "accuracy"), ("🤖 ML", "ml")], _MENU_ROW))
+            return
+
+        correct = d.get("correct", 0)
+        wrong   = d.get("wrong", 0)
+        total   = d.get("count", 0)
+        by_ses  = d.get("session_accuracy", {})
+
+        def _acc_em(a):
+            return "🟢" if a >= 0.6 else ("🟡" if a >= 0.5 else "🔴")
+
+        lines = [
+            f"📊 *ML Aniqlik — XAUUSD H1*\n",
+            f"Umumiy:  {_acc_em(acc)} `{acc * 100:.1f}%`",
+            f"To'g'ri: `{correct}` / `{total}` ta\n",
+        ]
+
+        if by_ses:
+            lines.append("*Sessiya bo'yicha*")
+            for ses, a in sorted(by_ses.items(), key=lambda x: -x[1]):
+                ses_em = "🌅" if ses == "london" else ("🗽" if ses == "newyork" else "🌙")
+                lines.append(f"{ses_em} {ses.capitalize()}: `{a * 100:.1f}%`")
+
+        lines.append(f"\n_{datetime.utcnow().strftime('%H:%M UTC')}_")
+        kb = _kb([("🔄 Yangilash", "accuracy"), ("⚠️ Patternlar", "patterns")],
+                 [("🤖 ML", "ml"), ("🔁 Retrain", "retrain")], _MENU_ROW)
+        send(chat_id, "\n".join(lines), buttons=kb)
+
+    except Exception as exc:
+        send(chat_id, f"⚠️ Aniqlik xatosi: {exc}", buttons=_kb(_MENU_ROW))
+
+
+def _handle_patterns(chat_id: str) -> None:
+    """Xato prediction patternlari — MLTrainer penalty uchun."""
+    try:
+        r = httpx.get(
+            "http://localhost:8001/api/v1/ml/feedback/error-patterns",
+            params={"symbol": "XAUUSD", "timeframe": "60", "min_occurrences": 2},
+            timeout=10,
+        )
+        d = r.json() if r.status_code == 200 else {}
+        patterns = d.get("patterns", [])
+
+        if not patterns:
+            send(chat_id,
+                 "⚠️ *Xato Patternlar*\n\nHali kamida 2 marta takrorlangan xato pattern topilmadi.\n"
+                 "Bu yaxshi belgi — model xatolardan o'rganmoqda.",
+                 buttons=_kb([("🔄 Yangilash", "patterns"), ("📈 Aniqlik", "accuracy")], _MENU_ROW))
+            return
+
+        lines = [f"⚠️ *Xato Patternlar — XAUUSD H1* ({len(patterns)} ta)\n"]
+        for i, p in enumerate(patterns[:8], 1):
+            err  = p.get("error_rate", 0) or 0
+            occ  = p.get("occurrences", 0)
+            pen  = p.get("weight_penalty", 0) or 0
+            pt   = p.get("pattern_type", "?").replace("_", " ").title()
+            ses  = p.get("session") or "—"
+            lines.append(
+                f"{i}. *{pt}*\n"
+                f"   Xato: `{err * 100:.0f}%` | Soni: `{occ}` | Penalty: `{pen:.2f}`\n"
+                f"   Sessiya: `{ses}`"
+            )
+
+        lines.append(f"\n_Model bu patternlarda sample weight kamaytiradi_")
+        lines.append(f"_{datetime.utcnow().strftime('%H:%M UTC')}_")
+
+        kb = _kb([("🔄 Yangilash", "patterns"), ("🔁 Retrain", "retrain")],
+                 [("📈 Aniqlik", "accuracy"), ("🤖 ML", "ml")], _MENU_ROW)
+        send(chat_id, "\n".join(lines), buttons=kb)
+
+    except Exception as exc:
+        send(chat_id, f"⚠️ Pattern xatosi: {exc}", buttons=_kb(_MENU_ROW))
+
+
+def _handle_retrain(chat_id: str) -> None:
+    """Modelni qo'lda qayta o'qitish."""
+    send(chat_id, "🔁 Model qayta o'qitilmoqda... Bu 30–60 soniya olishi mumkin.")
+    try:
+        r = httpx.post(
+            "http://localhost:8001/api/v1/ml/feedback/retrain",
+            params={"symbol": "XAUUSD", "timeframe": "60"},
+            timeout=120,
+        )
+        d = r.json() if r.status_code == 200 else {"retrained": False, "reason": r.text[:200]}
+
+        if d.get("retrained"):
+            metrics  = d.get("metrics", {})
+            version  = metrics.get("version", "?")
+            samples  = metrics.get("sample_count", 0)
+            trained  = metrics.get("trained_models", [])
+            patterns = d.get("error_patterns_applied", 0)
+            lines = [
+                "✅ *Model muvaffaqiyatli yangilandi!*\n",
+                f"Versiya:   `{version}`",
+                f"Namunalar: `{samples}` ta",
+                f"Modellar:  `{', '.join(trained) if trained else '—'}`",
+                f"Penaltylar: `{patterns}` ta xato pattern qo'llandi\n",
+                f"_Model keyingi predictiondan boshlab yangi versiyadan foydalanadi_",
+                f"_{datetime.utcnow().strftime('%H:%M UTC')}_",
+            ]
+            send(chat_id, "\n".join(lines),
+                 buttons=_kb([("🤖 ML", "ml"), ("📈 Aniqlik", "accuracy")], _MENU_ROW))
+        else:
+            reason_map = {
+                "too_soon":           "Oxirgi retrainingdan 30 daqiqa o'tmagan",
+                "trigger_not_met":    "Trigger shartlari bajarilmagan (xato/candle kam)",
+                "insufficient_candles": "Yetarli candle yo'q (200 dan kam)",
+                "dataset_too_small":  "Dataset juda kichik (100 dan kam namuna)",
+            }
+            reason = d.get("reason", "unknown")
+            reason_txt = reason_map.get(reason, reason)
+            send(chat_id,
+                 f"ℹ️ *Retrain bajarilmadi*\n\nSabab: `{reason_txt}`",
+                 buttons=_kb([("🔁 Majburiy Retrain", "retrain"), ("🤖 ML", "ml")], _MENU_ROW))
+
+    except Exception as exc:
+        send(chat_id, f"⚠️ Retrain xatosi: {exc}", buttons=_kb(_MENU_ROW))
+
+
 def _handle_status(chat_id: str) -> None:
     try:
         health = httpx.get("http://localhost:8001/api/v1/health", timeout=5).json()
@@ -402,8 +612,14 @@ def _handle_status(chat_id: str) -> None:
 
 def _send_signal_message(chat_id: str, d: Dict[str, Any]) -> None:
     sig  = d.get("signal_type", "NEUTRAL")
-    em   = "🟢" if sig == "BUY" else ("🔴" if sig == "SELL" else "⚪")
     conf = d.get("confidence") or 0
+
+    if sig == "BUY":
+        sig_header = "🟢 ═══════════════════\n📈  *BUY — SOTIB OL*\n🟢 ═══════════════════"
+    elif sig == "SELL":
+        sig_header = "🔴 ═══════════════════\n📉  *SELL — SOT*\n🔴 ═══════════════════"
+    else:
+        sig_header = "⚪ ═══════════════════\n⏸  *NO TRADE — Kuting*\n⚪ ═══════════════════"
 
     def _f(v): return f"{v:.2f}" if v is not None else "—"
 
@@ -421,23 +637,66 @@ def _send_signal_message(chat_id: str, d: Dict[str, Any]) -> None:
         filled = round(v / 10)
         return "█" * filled + "░" * (10 - filled)
 
+    if sig in ("BUY", "SELL"):
+        trade_section = (
+            f"💰 *Savdo Rejasi*\n"
+            f"Kirish:      `{_f(entry)}`\n"
+            f"Stop Loss:   `{_f(sl)}`\n"
+            f"Take Profit: `{_f(tp)}`\n"
+            f"R/R:         `{f'{rr:.2f}R' if rr else '—'}`\n\n"
+        )
+    else:
+        trade_section = "ℹ️ _Bozor yo'nalishi aniq emas. Savdo ochish tavsiya etilmaydi._\n\n"
+
     kb = _kb(_SIGNAL_ACTIONS, _AFTER_SIGNAL, _MENU_ROW)
     send(chat_id,
-         f"{em} *XAUUSD · H1 Signal*\n\n"
-         f"💰 *Savdo Rejasi*\n"
-         f"Kirish:      `{_f(entry)}`\n"
-         f"Stop Loss:   `{_f(sl)}`\n"
-         f"Take Profit: `{_f(tp)}`\n"
-         f"R/R:         `{f'{rr:.2f}R' if rr else '—'}`\n\n"
+         f"{sig_header}\n"
+         f"*XAUUSD · H1 | {datetime.utcnow().strftime('%d %b %H:%M UTC')}*\n\n"
+         f"{trade_section}"
          f"📊 *Ishonch: {conf:.1f}%*\n"
-         f"`TA  {_bar(tech)} {tech:.0f}`\n"
-         f"`SMC {_bar(smc)}  {smc:.0f}`\n"
-         f"`ML  {_bar(ml)}   {ml:.0f}`\n"
-         f"`News{_bar(news)} {news:.0f}`\n\n"
-         f"📝 _{rsn}_\n\n"
-         f"_Confidence: {conf:.0f}% | Filter: active | "
-         f"{datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}_",
+         f"`TA   {_bar(tech)} {tech:.0f}`\n"
+         f"`SMC  {_bar(smc)} {smc:.0f}`\n"
+         f"`ML   {_bar(ml)} {ml:.0f}`\n"
+         f"`News {_bar(news)} {news:.0f}`\n\n"
+         f"📝 _{rsn}_",
          buttons=kb)
+
+
+# ── ML broadcast (called from realtime_predictor when high-confidence prediction) ──
+
+def alert_ml_prediction(
+    symbol: str,
+    timeframe: str,
+    direction: str,
+    buy_pct: float,
+    sell_pct: float,
+    score: float,
+    models_used: int,
+) -> int:
+    """
+    Faqat yuqori ishonchli (score ≥ 70) ML predictionlarni broadcast qiladi.
+    """
+    if score < 70:
+        return 0
+    if direction == "neutral":
+        return 0
+
+    dir_em = "🟢" if direction == "bullish" else "🔴"
+    tf_lbl = f"H{int(timeframe) // 60}" if int(timeframe) >= 60 else f"M{timeframe}"
+
+    def _bar(v):
+        filled = round(float(v or 0) / 10)
+        return "█" * filled + "░" * (10 - filled)
+
+    text = (
+        f"{dir_em} *ML Prediction — {symbol} {tf_lbl}*\n\n"
+        f"Yo'nalish: *{direction.upper()}*\n"
+        f"Score: `{score:.1f}%` | Modellar: `{models_used}`\n\n"
+        f"`BUY  {_bar(buy_pct)} {buy_pct:.1f}%`\n"
+        f"`SELL {_bar(sell_pct)} {sell_pct:.1f}%`\n\n"
+        f"_ML auto-prediction | {datetime.utcnow().strftime('%H:%M UTC')}_"
+    )
+    return broadcast(text)
 
 
 # ── Public alert (called from signals router after signal generation) ─────────
@@ -499,6 +758,10 @@ _COMMANDS = {
     "/news":     _handle_news,
     "/analysis": _handle_analysis,
     "/status":   _handle_status,
+    "/ml":       _handle_ml,
+    "/accuracy": _handle_accuracy,
+    "/patterns": _handle_patterns,
+    "/retrain":  _handle_retrain,
 }
 
 _CALLBACKS = {
@@ -509,6 +772,10 @@ _CALLBACKS = {
     "analysis": _handle_analysis,
     "status":   _handle_status,
     "help":     _handle_help,
+    "ml":       _handle_ml,
+    "accuracy": _handle_accuracy,
+    "patterns": _handle_patterns,
+    "retrain":  _handle_retrain,
 }
 
 _polling_thread: Optional[threading.Thread] = None

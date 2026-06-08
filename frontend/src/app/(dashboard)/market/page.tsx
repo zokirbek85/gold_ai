@@ -7,6 +7,7 @@ import { TradingViewChart } from "@/components/charts/TradingViewChart";
 
 const SYMBOL = "XAUUSD";
 const TIMEFRAMES = [
+  { value: "1", label: "M1" },
   { value: "5", label: "M5" },
   { value: "15", label: "M15" },
   { value: "60", label: "H1" },
@@ -29,7 +30,7 @@ export default function MarketPage() {
   // SSE live price from backend
   useEffect(() => {
     const connect = () => {
-      const es = new EventSource(`/api/v1/market-data/stream?symbol=${SYMBOL}`);
+      const es = new EventSource(`/api/stream?symbol=${SYMBOL}`);
       esRef.current = es;
       es.onopen = () => { setSseOk(true); setPriceSource("sse"); };
       es.onmessage = (e) => {
