@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.candle import Candle
 from models.signal import Signal
-from services.signal_service import generate_signal
+from services.signal_service import generate_signal, enrich_signal
 from services.market_service import fetch_and_store
 from services.news_service import get_sentiment_summary, refresh_news
 from services.calendar_service import get_aggregate_score, refresh_calendar
@@ -37,6 +37,14 @@ class SignalOut(BaseModel):
     economic_score: Optional[float] = None
     reasoning: Optional[str] = None
     created_at: datetime
+    lot_size: Optional[float] = None
+    risk_amount_usd: Optional[float] = None
+    plain_explanation: Optional[str] = None
+    signal_emoji: Optional[str] = None
+    sl_distance_pct: Optional[float] = None
+    tp1_distance_pct: Optional[float] = None
+    tp2_distance_pct: Optional[float] = None
+    tp3_distance_pct: Optional[float] = None
 
     class Config:
         from_attributes = True
@@ -169,6 +177,9 @@ def generate(
     else:
         result.setdefault("confluence", None)
 
+    # Enrich with lot size, distances, plain explanation
+    result = enrich_signal(result, payload.account_balance)
+
     sig = Signal(
         symbol=result["symbol"],
         timeframe=result["timeframe"],
@@ -186,6 +197,14 @@ def generate(
         news_score=result.get("news_score"),
         economic_score=result.get("economic_score"),
         reasoning=result.get("reasoning"),
+        lot_size=result.get("lot_size"),
+        risk_amount_usd=result.get("risk_amount_usd"),
+        plain_explanation=result.get("plain_explanation"),
+        signal_emoji=result.get("signal_emoji"),
+        sl_distance_pct=result.get("sl_distance_pct"),
+        tp1_distance_pct=result.get("tp1_distance_pct"),
+        tp2_distance_pct=result.get("tp2_distance_pct"),
+        tp3_distance_pct=result.get("tp3_distance_pct"),
     )
     db.add(sig)
     db.commit()

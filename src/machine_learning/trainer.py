@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 log = logging.getLogger(__name__)
 
-MODEL_DIR = os.environ.get("ML_MODEL_DIR", "models")
+MODEL_DIR = os.environ.get("ML_MODEL_DIR", os.path.join(os.path.dirname(__file__), "..", "..", "models"))
 
 
 def _ensure_dir() -> None:

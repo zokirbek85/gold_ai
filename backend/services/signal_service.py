@@ -279,6 +279,89 @@ def generate_signal(
     }
 
 
+def enrich_signal(result: Dict[str, Any], account_balance: float = 10000.0) -> Dict[str, Any]:
+    """
+    Adds lot_size, risk_amount_usd, distance fields, plain_explanation, signal_emoji.
+    Mutates and returns result.
+    """
+    import sys
+    import os as _os
+    sys.path.insert(0, _os.path.join(_os.path.dirname(__file__), "..", ".."))
+    from src.risk_management.calculator import risk_calculator
+
+    signal_type = result.get("signal_type", "NEUTRAL")
+    entry       = result.get("entry")
+    stop_loss   = result.get("stop_loss")
+    tp1         = result.get("tp1")
+    take_profit = result.get("take_profit")  # tp2
+    tp3         = result.get("tp3")
+    confidence  = result.get("confidence", 0.0) or 0.0
+    reasoning   = result.get("reasoning") or ""
+
+    emoji = "🟢" if signal_type == "BUY" else ("🔴" if signal_type == "SELL" else "⚪")
+    result["signal_emoji"] = emoji
+
+    if signal_type == "NEUTRAL" or entry is None or stop_loss is None:
+        result["lot_size"]         = None
+        result["risk_amount_usd"]  = None
+        result["sl_distance_pct"]  = None
+        result["tp1_distance_pct"] = None
+        result["tp2_distance_pct"] = None
+        result["tp3_distance_pct"] = None
+        result["plain_explanation"] = (
+            "⚪ NEUTRAL — Bozor noaniq. Savdo qilmang.\n"
+            "⚪ NEUTRAL — Market unclear. Do not trade."
+        )
+        return result
+
+    sizing    = risk_calculator.position_size(account_balance, entry, stop_loss, symbol=result.get("symbol", "XAUUSD"))
+    lot_size  = sizing["lots"]
+    risk_usd  = sizing["risk_amount"]
+    sl_dist   = abs(entry - stop_loss)
+    sl_pct    = round(sl_dist / entry * 100, 3) if entry else 0.0
+
+    def _dist(tp_price):
+        return abs(tp_price - entry) if tp_price else 0.0
+    def _pct(tp_price):
+        return round(abs(tp_price - entry) / entry * 100, 3) if tp_price and entry else 0.0
+
+    result["lot_size"]         = lot_size
+    result["risk_amount_usd"]  = risk_usd
+    result["sl_distance_pct"]  = sl_pct
+    result["tp1_distance_pct"] = _pct(tp1)
+    result["tp2_distance_pct"] = _pct(take_profit)
+    result["tp3_distance_pct"] = _pct(tp3)
+
+    def _f(v): return f"{v:.2f}" if v is not None else "—"
+    tp1_dist = _dist(tp1)
+    tp2_dist = _dist(take_profit)
+    tp3_dist = _dist(tp3)
+
+    uz_type = "BUY" if signal_type == "BUY" else "SELL"
+    en_type = uz_type
+
+    result["plain_explanation"] = (
+        f"{emoji} {uz_type} — Ishonch: {confidence:.0f}%\n"
+        f"   Kirish: ${_f(entry)}\n"
+        f"   Stop Loss: ${_f(stop_loss)} (−{_f(sl_dist)} | −{sl_pct}%)\n"
+        f"   Take Profit 1: ${_f(tp1)} (+{_f(tp1_dist)}) ← 50% yoping\n"
+        f"   Take Profit 2: ${_f(take_profit)} (+{_f(tp2_dist)}) ← 30% yoping\n"
+        f"   Take Profit 3: ${_f(tp3)} (+{_f(tp3_dist)}) ← qolgan 20%\n"
+        f"   Lot hajmi: {lot_size} lot (Hisob: ${account_balance:.0f} | Risk: ${risk_usd:.2f})\n"
+        f"   Sabab: {reasoning}\n"
+        f"\n"
+        f"{emoji} {en_type} — Confidence: {confidence:.0f}%\n"
+        f"   Entry: ${_f(entry)}\n"
+        f"   Stop Loss: ${_f(stop_loss)} (−{_f(sl_dist)} | −{sl_pct}%)\n"
+        f"   Take Profit 1: ${_f(tp1)} (+{_f(tp1_dist)}) ← close 50%\n"
+        f"   Take Profit 2: ${_f(take_profit)} (+{_f(tp2_dist)}) ← close 30%\n"
+        f"   Take Profit 3: ${_f(tp3)} (+{_f(tp3_dist)}) ← close remaining 20%\n"
+        f"   Lot size: {lot_size} lots (Balance: ${account_balance:.0f} | Risk: ${risk_usd:.2f})\n"
+        f"   Reason: {reasoning}"
+    )
+    return result
+
+
 def _empty_signal(symbol: str, timeframe: str) -> Dict[str, Any]:
     return {
         "symbol": symbol, "timeframe": timeframe,

@@ -285,6 +285,21 @@ def _ml_projection(symbol: str, timeframe: str, candles: List[Dict]) -> Dict[str
 
 def generate_forecast(db: Session, symbol: str, timeframe: str) -> Dict[str, Any]:
     from services.market_service import fetch_twelvedata, upsert_candles, TF_TO_TD
+    from services.news_service import refresh_news
+    from services.calendar_service import refresh_calendar
+    from services.historical_analysis import (
+        monthly_seasonality, event_impact_analysis, zone_test_analysis,
+    )
+
+    # Refresh news and economic calendar so historical event data is current
+    try:
+        refresh_news(db)
+    except Exception:
+        pass
+    try:
+        refresh_calendar(db)
+    except Exception:
+        pass
 
     # Refresh candles from Twelvedata
     interval = TF_TO_TD.get(str(timeframe), "1h")
@@ -341,6 +356,21 @@ def generate_forecast(db: Session, symbol: str, timeframe: str) -> Dict[str, Any
     sr   = _support_resistance(candles[-100:])
     fib  = _fibonacci(candles)
 
+    # Historical analysis
+    current_month = datetime.utcnow().month
+    seasonality   = monthly_seasonality(db, symbol, current_month)
+    event_impact  = event_impact_analysis(
+        db, symbol,
+        ["nfp", "non-farm", "cpi", "inflation", "fomc", "fed rate"],
+    )
+    # Find nearest S/R level for zone analysis
+    current_price = float(candles[-1]["close"])
+    nearest_zone  = min(sr, key=lambda x: abs(x["level"] - current_price), default=None)
+    zone_analysis = (
+        zone_test_analysis(db, symbol, nearest_zone["level"])
+        if nearest_zone else {"insufficient_data": True}
+    )
+
     # Signal markers from DB
     db_sigs = (
         db.query(Signal)
@@ -379,5 +409,8 @@ def generate_forecast(db: Session, symbol: str, timeframe: str) -> Dict[str, Any
         },
         "latest_signal": latest_signal,
         "ml_forecast": ml,
+        "seasonality":    seasonality,
+        "event_impact":   event_impact,
+        "zone_analysis":  zone_analysis,
         "generated_at": datetime.utcnow().isoformat(),
     }

@@ -14,10 +14,12 @@ export interface Signal {
   id: number;
   symbol: string;
   timeframe: string;
-  signal_type: "BUY" | "SELL" | "NO TRADE";
+  signal_type: "BUY" | "SELL" | "NO TRADE" | "NEUTRAL";
   entry: number | null;
   stop_loss: number | null;
   take_profit: number | null;
+  tp1: number | null;
+  tp3: number | null;
   rr: number | null;
   confidence: number | null;
   technical_score: number | null;
@@ -27,6 +29,14 @@ export interface Signal {
   economic_score: number | null;
   reasoning: string | null;
   created_at: string;
+  lot_size: number | null;
+  risk_amount_usd: number | null;
+  plain_explanation: string | null;
+  signal_emoji: string | null;
+  sl_distance_pct: number | null;
+  tp1_distance_pct: number | null;
+  tp2_distance_pct: number | null;
+  tp3_distance_pct: number | null;
 }
 
 export interface NewsArticle {

@@ -159,6 +159,10 @@ export default function ForecastPage() {
   const srs  = data?.overlays?.support_resistance ?? [];
   const fib  = data?.overlays?.fibonacci;
 
+  const seasonality  = (data as Record<string, unknown> | undefined)?.seasonality  as Record<string, unknown> | undefined;
+  const eventImpact  = (data as Record<string, unknown> | undefined)?.event_impact  as Record<string, unknown> | undefined;
+  const zoneAnalysis = (data as Record<string, unknown> | undefined)?.zone_analysis as Record<string, unknown> | undefined;
+
   const bullObs = obs.filter(o => o.type === "bullish").length;
   const bearObs = obs.filter(o => o.type === "bearish").length;
   const bullFvg = fvgs.filter(f => f.type === "bullish").length;
@@ -582,6 +586,93 @@ export default function ForecastPage() {
             </table>
           </div>
         </Card>
+      )}
+
+      {/* ── Tarixiy tahlil (Historical Analysis) ── */}
+      {(seasonality || eventImpact || zoneAnalysis) && (
+        <div>
+          <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--text-muted)" }}>
+            📅 Tarixiy tahlil
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+            {/* Seasonality */}
+            {seasonality && !seasonality.insufficient_data && (
+              <Card>
+                <div className="p-4">
+                  <p className="text-xs font-semibold mb-2" style={{ color: "var(--text-muted)" }}>
+                    🗓 Oylik mavsumiylik
+                  </p>
+                  <p className="text-sm" style={{ color: "var(--text)" }}>
+                    Bu oyda oltin tarixan:{" "}
+                    <span className={`font-bold ${(seasonality.avg_change_pct as number) >= 0 ? "text-green-400" : "text-red-400"}`}>
+                      {(seasonality.avg_change_pct as number) >= 0 ? "↑" : "↓"}{" "}
+                      {(seasonality.win_rate_pct as number).toFixed(0)}% hollarda ko'tarilgan
+                    </span>
+                    {", o'rtacha "}
+                    <span className="font-mono font-bold" style={{ color: "var(--gold)" }}>
+                      {(seasonality.avg_change_pct as number) >= 0 ? "+" : ""}
+                      {(seasonality.avg_change_pct as number).toFixed(2)}%
+                    </span>
+                  </p>
+                  <p className="text-[10px] mt-2" style={{ color: "var(--text-faint)" }}>
+                    {seasonality.years_analyzed as number} yil tahlil qilindi
+                  </p>
+                </div>
+              </Card>
+            )}
+
+            {/* Event impact */}
+            {eventImpact && !eventImpact.insufficient_data && (
+              <Card>
+                <div className="p-4">
+                  <p className="text-xs font-semibold mb-2" style={{ color: "var(--text-muted)" }}>
+                    📰 NFP / FOMC ta'siri
+                  </p>
+                  <p className="text-sm" style={{ color: "var(--text)" }}>
+                    Voqealardan keyin o'rtacha harakat:{" "}
+                    <span className={`font-bold font-mono ${(eventImpact.avg_post_24h_move as number) >= 0 ? "text-green-400" : "text-red-400"}`}>
+                      {(eventImpact.avg_post_24h_move as number) >= 0 ? "+" : ""}
+                      {(eventImpact.avg_post_24h_move as number).toFixed(2)}$
+                    </span>
+                  </p>
+                  <p className="text-[10px] mt-2" style={{ color: "var(--text-faint)" }}>
+                    Bullish: {(eventImpact.bullish_after_pct as number).toFixed(0)}% |{" "}
+                    {eventImpact.events_analyzed as number} ta voqea
+                  </p>
+                </div>
+              </Card>
+            )}
+
+            {/* Zone analysis */}
+            {zoneAnalysis && !zoneAnalysis.insufficient_data && (zoneAnalysis.touches as number) > 0 && (
+              <Card>
+                <div className="p-4">
+                  <p className="text-xs font-semibold mb-2" style={{ color: "var(--text-muted)" }}>
+                    🎯 Zona sinovi
+                  </p>
+                  <p className="text-sm" style={{ color: "var(--text)" }}>
+                    <span className="font-mono font-bold" style={{ color: "var(--gold)" }}>
+                      ${(zoneAnalysis.zone_price as number).toFixed(2)}
+                    </span>{" "}
+                    zona{" "}
+                    <span className="font-bold">{zoneAnalysis.touches as number} marta</span> sinaldi —{" "}
+                    <span className="text-green-400 font-bold">
+                      {(zoneAnalysis.bounce_rate_pct as number).toFixed(0)}%
+                    </span>{" "}
+                    hollarda qaytgan
+                  </p>
+                  {Boolean(zoneAnalysis.last_touch_date) && (
+                    <p className="text-[10px] mt-2" style={{ color: "var(--text-faint)" }}>
+                      Oxirgi sinov: {String(zoneAnalysis.last_touch_date)}
+                    </p>
+                  )}
+                </div>
+              </Card>
+            )}
+
+          </div>
+        </div>
       )}
     </div>
   );

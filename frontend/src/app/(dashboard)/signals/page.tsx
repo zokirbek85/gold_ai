@@ -8,6 +8,8 @@ import {
   Card, CardHeader, PageHeader, SignalBadge, ScoreBar,
   Select, EmptyState, SkeletonRow,
 } from "@/components/ui";
+import { BeginnerToggle, SignalExplainer } from "@/components/BeginnerMode";
+import { useBeginnerMode } from "@/hooks/useBeginnerMode";
 import { Zap, RefreshCw, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import type { Signal } from "@/types";
 
@@ -33,6 +35,7 @@ export default function SignalsPage() {
   const [symbol, setSymbol] = useState("XAUUSD");
   const [timeframe, setTimeframe] = useState("60");
   const qc = useQueryClient();
+  const [isBeginnerMode, toggleBeginnerMode] = useBeginnerMode();
 
   const { data: signals, isLoading } = useQuery({
     queryKey: ["signals", symbol, timeframe],
@@ -53,6 +56,7 @@ export default function SignalsPage() {
         subtitle="AI-generated XAUUSD signals combining TA + SMC + ML + News"
         action={
           <div className="flex items-center gap-2">
+            <BeginnerToggle isBeginnerMode={isBeginnerMode} onToggle={toggleBeginnerMode} />
             <Select options={SYMBOLS} value={symbol} onChange={e => setSymbol(e.target.value)} className="w-28" />
             <Select options={TIMEFRAMES} value={timeframe} onChange={e => setTimeframe(e.target.value)} className="w-20" />
             <button
@@ -72,7 +76,18 @@ export default function SignalsPage() {
       />
 
       {/* Generated signal result */}
-      {latest && (
+      {latest && isBeginnerMode && (
+        <Card className={
+          latest.signal_type === "BUY"  ? "border-green-500/40" :
+          latest.signal_type === "SELL" ? "border-red-500/40"   : ""
+        }>
+          <div className="p-5">
+            <SignalExplainer signal={latest as Signal & { [key: string]: unknown }} />
+          </div>
+        </Card>
+      )}
+
+      {latest && !isBeginnerMode && (
         <Card className={
           latest.signal_type === "BUY"  ? "border-green-500/40" :
           latest.signal_type === "SELL" ? "border-red-500/40"   : ""

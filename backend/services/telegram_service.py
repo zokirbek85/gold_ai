@@ -610,9 +610,24 @@ def _handle_status(chat_id: str) -> None:
         send(chat_id, "❌ Backend bilan bog'lanib bo'lmadi.", buttons=_kb(_MENU_ROW))
 
 
+def _escape_md(text: str) -> str:
+    """Escape special MarkdownV2 characters."""
+    for ch in r"_*[]()~`>#+-=|{}.!":
+        text = text.replace(ch, f"\\{ch}")
+    return text
+
+
 def _send_signal_message(chat_id: str, d: Dict[str, Any]) -> None:
     sig  = d.get("signal_type", "NEUTRAL")
     conf = d.get("confidence") or 0
+    kb   = _kb(_SIGNAL_ACTIONS, _AFTER_SIGNAL, _MENU_ROW)
+
+    # Prefer human-readable plain_explanation if available
+    plain = d.get("plain_explanation")
+    if plain:
+        header_ts = f"*XAUUSD · H1 | {datetime.utcnow().strftime('%d %b %H:%M UTC')}*\n\n"
+        send(chat_id, header_ts + plain, buttons=kb)
+        return
 
     if sig == "BUY":
         sig_header = "🟢 ═══════════════════\n📈  *BUY — SOTIB OL*\n🟢 ═══════════════════"
@@ -648,7 +663,6 @@ def _send_signal_message(chat_id: str, d: Dict[str, Any]) -> None:
     else:
         trade_section = "ℹ️ _Bozor yo'nalishi aniq emas. Savdo ochish tavsiya etilmaydi._\n\n"
 
-    kb = _kb(_SIGNAL_ACTIONS, _AFTER_SIGNAL, _MENU_ROW)
     send(chat_id,
          f"{sig_header}\n"
          f"*XAUUSD · H1 | {datetime.utcnow().strftime('%d %b %H:%M UTC')}*\n\n"
