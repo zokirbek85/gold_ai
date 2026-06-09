@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change-me-to-a-64-char-random-secret-in-production-env"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    ML_MODEL_DIR: str = "/app/models"
+    ML_MODEL_DIR: str = "/app/ml_models"
     CORS_ORIGINS: str = "http://localhost:3000,http://frontend:3000"
 
     # ── External APIs (no hardcoded defaults) ─────────────────────────────────

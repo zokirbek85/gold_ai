@@ -16,7 +16,7 @@ COPY backend/ .
 # Copy shared src modules (signals, ML, risk management, etc.)
 COPY src/ ./src/
 
-RUN mkdir -p /app/models
+RUN mkdir -p /app/ml_models
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app

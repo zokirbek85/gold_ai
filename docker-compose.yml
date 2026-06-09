@@ -35,14 +35,14 @@ services:
     ports:
       - "${WEB_HOST_PORT:-8001}:8001"
     volumes:
-      - models_data:/app/models
+      - models_data:/app/ml_models
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-goldai}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-goldai}
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set in .env}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
-      ML_MODEL_DIR: /app/models
+      ML_MODEL_DIR: /app/ml_models
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://frontend:3000}
       TWELVEDATA_API_KEY: ${TWELVEDATA_API_KEY:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}

@@ -11,5 +11,4 @@ dev.db
 .github
 frontend/node_modules
 frontend/.next
-models/
 docs/

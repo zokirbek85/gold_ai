@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.candle import Candle
 from models.signal import Signal
-from services.signal_service import generate_signal, enrich_signal
+from services.signal_service import generate_signal, enrich_signal, _compute_sl_tp, _calc_atr
 from services.market_service import fetch_and_store
 from services.news_service import get_sentiment_summary, refresh_news
 from services.calendar_service import get_aggregate_score, refresh_calendar
@@ -84,16 +84,19 @@ def _apply_confluence(
     Compute multi-TF confluence and blend it into the signal result dict.
     Mutates and returns result.
     """
+    from config import settings as _s
+
     direction = result.get("direction", "neutral")
-    # Use a concrete direction for scoring even when composite is in neutral zone
+    # Use combined_score (not composite_score) to determine directional bias
+    combined = float(result.get("combined_score", 50.0))
     conf_dir = direction if direction != "neutral" else (
-        "bullish" if result.get("composite_score", 50) > 50 else "bearish"
+        "bullish" if combined > 50 else "bearish"
     )
 
     confluence = signal_scorer.confluence_score(candles_h4, candles_h1, candles_m15, conf_dir)
     alignment  = confluence["alignment"]
 
-    composite = float(result.get("composite_score", 50.0))
+    composite = combined
     if alignment == "full":
         composite = min(100.0, composite + 8)
     elif alignment == "partial":
@@ -107,6 +110,25 @@ def _apply_confluence(
             result["take_profit"] = None
             result["tp1"]         = None
             result["risk_reward"] = None
+
+    # Upgrade NEUTRAL → BUY/SELL when confluence bonus crosses threshold
+    if result.get("signal_type") == "NEUTRAL" and result.get("entry"):
+        atr = _calc_atr(candles_h1)
+        entry = float(result["entry"])
+        if composite >= _s.SIGNAL_BUY_THRESHOLD:
+            sl, tp1, tp2, tp3 = _compute_sl_tp("BUY", entry, candles_h1, atr)
+            rr = round(abs(tp2 - entry) / (abs(entry - sl) + 1e-9), 2) if sl and tp2 else None
+            conf = round(min(abs(composite - 50) * 3.33, 100), 1)
+            result.update({"signal_type": "BUY", "stop_loss": sl,
+                           "take_profit": tp2, "tp1": tp1, "tp3": tp3,
+                           "rr": rr, "confidence": conf})
+        elif composite <= _s.SIGNAL_SELL_THRESHOLD:
+            sl, tp1, tp2, tp3 = _compute_sl_tp("SELL", entry, candles_h1, atr)
+            rr = round(abs(tp2 - entry) / (abs(entry - sl) + 1e-9), 2) if sl and tp2 else None
+            conf = round(min(abs(composite - 50) * 3.33, 100), 1)
+            result.update({"signal_type": "SELL", "stop_loss": sl,
+                           "take_profit": tp2, "tp1": tp1, "tp3": tp3,
+                           "rr": rr, "confidence": conf})
 
     result["composite_score"] = round(composite, 1)
     result["confluence"]      = confluence
