@@ -2,92 +2,115 @@
 Shared pytest fixtures for Gold AI test suite.
 Uses SQLite in-memory database — no PostgreSQL or Redis required in CI.
 """
+import os
+import sys
+
+# Set env vars BEFORE importing any backend modules so config picks them up
+os.environ.setdefault("DATABASE_URL", "sqlite:///./test_gold_ai.db")
+os.environ.setdefault("SECRET_KEY", "test-secret-key-32-chars-minimum-xx")
+os.environ.setdefault("ADMIN_EMAIL", "admin@test.local")
+os.environ.setdefault("ADMIN_PASSWORD", "testpass123")
+os.environ.setdefault("ML_MODEL_DIR", "/tmp/goldai_test_models")
+
+# Make both code trees importable
+_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(_root, "backend"))
+sys.path.insert(0, os.path.join(_root, "src"))
+
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
-
-from src.database.models import Base
-from src.database.session import get_db
-from src.main import app
 
 TEST_DATABASE_URL = "sqlite:///:memory:"
 
-engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+@pytest.fixture(scope="session")
+def test_engine():
+    from database import Base
+    # Import all models so they register on the metadata
+    import models  # noqa: F401
 
-def override_get_db():
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    engine = create_engine(
+        TEST_DATABASE_URL,
+        connect_args={"check_same_thread": False},
+    )
+    # Enable FK enforcement for SQLite
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_conn, _):
+        dbapi_conn.execute("PRAGMA foreign_keys=ON")
 
-
-@pytest.fixture(scope="session", autouse=True)
-def create_tables():
     Base.metadata.create_all(bind=engine)
-    yield
+    yield engine
     Base.metadata.drop_all(bind=engine)
 
 
+@pytest.fixture(scope="session")
+def TestingSessionLocal(test_engine):
+    return sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+
+
 @pytest.fixture()
-def db():
+def db(TestingSessionLocal):
     session = TestingSessionLocal()
     yield session
+    session.rollback()
     session.close()
 
 
 @pytest.fixture()
-def client(db):
+def client(test_engine, TestingSessionLocal):
+    from main import app
+    from database import get_db
+
+    def override_get_db():
+        session = TestingSessionLocal()
+        try:
+            yield session
+        finally:
+            session.close()
+
     app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as c:
+    with TestClient(app, raise_server_exceptions=False) as c:
         yield c
     app.dependency_overrides.clear()
 
 
 @pytest.fixture()
 def auth_headers(client):
-    """Register + login; return bearer auth headers."""
-    client.post("/api/v1/auth/register", json={"email": "test@gold.ai", "password": "TestPass123!"})
-    resp = client.post("/api/v1/auth/login", json={"email": "test@gold.ai", "password": "TestPass123!"})
-    token = resp.json()["access_token"]
+    """Register a regular user and return bearer auth headers."""
+    client.post("/api/v1/auth/register", json={"email": "user@test.local", "password": "TestPass123!"})
+    resp = client.post("/api/v1/auth/login", json={"email": "user@test.local", "password": "TestPass123!"})
+    data = resp.json()
+    token = data.get("access_token", "")
     return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture()
-def admin_headers(client):
-    """Register + promote to Admin + login."""
-    client.post("/api/v1/auth/register", json={"email": "admin@gold.ai", "password": "AdminPass123!"})
-    # Promote via direct DB
-    db = TestingSessionLocal()
-    from src.database import models
-    from src.core.security import hash_password
-    role = db.query(models.Role).filter(models.Role.name == "Admin").first()
-    if not role:
-        role = models.Role(name="Admin", description="Administrator")
-        db.add(role)
-        db.commit()
-        db.refresh(role)
-    user = db.query(models.User).filter(models.User.email == "admin@gold.ai").first()
+def admin_headers(client, db):
+    """Register a user, promote to admin, return auth headers."""
+    from models.user import User
+
+    client.post("/api/v1/auth/register", json={"email": "admin@test.local", "password": "AdminPass123!"})
+    user = db.query(User).filter(User.email == "admin@test.local").first()
     if user:
-        user.role_id = role.id
+        user.is_admin = True
         db.commit()
-    db.close()
-    resp = client.post("/api/v1/auth/login", json={"email": "admin@gold.ai", "password": "AdminPass123!"})
-    token = resp.json()["access_token"]
+
+    resp = client.post("/api/v1/auth/login", json={"email": "admin@test.local", "password": "AdminPass123!"})
+    data = resp.json()
+    token = data.get("access_token", "")
     return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture()
 def sample_candles():
-    """Generate 300 realistic XAUUSD-like candles for testing."""
+    """300 realistic XAUUSD-like candles for testing."""
     import random
     random.seed(42)
     candles = []
     price = 1900.0
-    for i in range(300):
+    for _ in range(300):
         change = random.gauss(0, 5)
         open_ = price
         close = price + change

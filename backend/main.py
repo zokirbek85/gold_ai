@@ -2,14 +2,37 @@ import logging
 import threading
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from config import settings
 from database import engine, Base, SessionLocal
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s")
 log = logging.getLogger(__name__)
+
+# ── Rate limiter (shared across all routers) ──────────────────────────────────
+limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
+
+# ── Sentry (graceful no-op when SENTRY_DSN is blank) ─────────────────────────
+if settings.SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            integrations=[FastApiIntegration(), SqlalchemyIntegration()],
+            traces_sample_rate=0.1,
+            environment="production",
+        )
+        log.info("Sentry initialised")
+    except Exception as exc:
+        log.warning("Sentry init failed: %s", exc)
 
 
 def _create_tables() -> None:
@@ -36,18 +59,20 @@ def _create_tables() -> None:
 def _create_admin_user() -> None:
     from models.user import User
     from routers.auth import hash_password
+    email = settings.ADMIN_EMAIL
+    password = settings.ADMIN_PASSWORD
     db = SessionLocal()
     try:
-        existing = db.query(User).filter(User.email == "admin@gold.ai").first()
+        existing = db.query(User).filter(User.email == email).first()
         if not existing:
             admin = User(
-                email="admin@gold.ai",
-                password_hash=hash_password("admin123"),
+                email=email,
+                password_hash=hash_password(password),
                 is_admin=True,
             )
             db.add(admin)
             db.commit()
-            log.info("Admin user created: admin@gold.ai / admin123")
+            log.info("Admin user created: %s (password from ADMIN_PASSWORD env)", email)
     except Exception:
         log.exception("Failed to create admin user")
         db.rollback()
@@ -117,13 +142,25 @@ app = FastAPI(
     redirect_slashes=False,
 )
 
+# Rate limiter state and error handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.get_cors_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
 )
+
+# ── Prometheus metrics ────────────────────────────────────────────────────────
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+    Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
+    log.info("Prometheus /metrics endpoint registered")
+except ImportError:
+    log.debug("prometheus-fastapi-instrumentator not installed — metrics disabled")
 
 from routers.auth import router as auth_router
 from routers.market_data import router as market_data_router
@@ -139,6 +176,7 @@ from routers.backtesting import router as backtesting_router
 from routers.admin import router as admin_router
 from routers.forecast import router as forecast_router
 from routers.telegram_service import router as telegram_router
+from routers.risk import router as risk_router
 from src.api.ml_feedback import router as ml_feedback_router
 
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["Auth"])
@@ -156,6 +194,7 @@ app.include_router(admin_router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(forecast_router, prefix="/api/v1/forecast", tags=["Forecast"])
 app.include_router(telegram_router, prefix="/api/v1/telegram", tags=["Telegram"])
 app.include_router(ml_feedback_router, prefix="/api/v1", tags=["ML Feedback"])
+app.include_router(risk_router, prefix="/api/v1/risk", tags=["Risk Management"])
 
 
 @app.get("/api/v1/health", tags=["Health"])

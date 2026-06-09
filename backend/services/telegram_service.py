@@ -77,9 +77,11 @@ class AlertFilter:
         self._last_signal[symbol]  = signal
         self._last_sent_at[symbol] = datetime.utcnow()
 
-TOKEN    = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-_BASE    = f"https://api.telegram.org/bot{TOKEN}"
+TOKEN          = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+_BASE          = f"https://api.telegram.org/bot{TOKEN}"
+_INTERNAL_URL  = os.environ.get("INTERNAL_BASE_URL", "http://localhost:8001").rstrip("/")
 
+# Registered chats — persisted in Redis (key: tg:registered_chats), in-memory fallback
 _registered_chats: Set[str] = set()
 _lock = threading.Lock()
 
@@ -98,6 +100,8 @@ _REDIS_BLOCKED_KEY = "tg:blocked_today"
 _REDIS_LAST_KEY    = "tg:last_signal"
 _TTL               = 86_400   # one calendar day in seconds
 
+_REDIS_CHATS_KEY   = "tg:registered_chats"
+
 try:
     import redis as _redis_mod
     _redis = _redis_mod.Redis.from_url(
@@ -106,6 +110,11 @@ try:
         socket_connect_timeout=2,
         socket_timeout=2,
     )
+    # Load previously persisted chat IDs on startup
+    _persisted = _redis.smembers(_REDIS_CHATS_KEY)
+    if _persisted:
+        _registered_chats.update(_persisted)
+        log.info("Telegram: loaded %d chat IDs from Redis", len(_persisted))
 except Exception:
     _redis = None
 
@@ -231,8 +240,14 @@ def broadcast(text: str) -> int:
 
 
 def register_chat(chat_id: str) -> None:
+    cid = str(chat_id)
     with _lock:
-        _registered_chats.add(str(chat_id))
+        _registered_chats.add(cid)
+    if _redis:
+        try:
+            _redis.sadd(_REDIS_CHATS_KEY, cid)
+        except Exception:
+            pass
 
 
 def get_registered_chats() -> List[str]:
@@ -245,10 +260,11 @@ def get_registered_chats() -> List[str]:
 def _handle_start(chat_id: str) -> None:
     register_chat(chat_id)
     kb = _kb(
-        [("💰 Narx", "price"),    ("📊 Signal",   "signal")],
-        [("📰 Yangilik", "news"), ("🔍 Tahlil",   "analysis")],
-        [("🤖 ML Tahlil", "ml"),  ("📈 Aniqlik",  "accuracy")],
-        [("⚙️ Holat", "status"),  ("❓ Yordam",   "help")],
+        [("💰 Narx", "price"),      ("📊 Signal",   "signal")],
+        [("📰 Yangilik", "news"),   ("🔍 Tahlil",   "analysis")],
+        [("🔮 Forecast", "forecast"), ("💼 Hisob",  "account")],
+        [("🤖 ML Tahlil", "ml"),    ("📈 Aniqlik",  "accuracy")],
+        [("⚙️ Holat", "status"),    ("❓ Yordam",   "help")],
     )
     send(chat_id,
          f"🤖 *Gold AI Trading Bot*\n\n"
@@ -260,10 +276,11 @@ def _handle_start(chat_id: str) -> None:
 
 def _handle_menu(chat_id: str) -> None:
     kb = _kb(
-        [("💰 Narx", "price"),    ("📊 Signal",   "signal")],
-        [("📰 Yangilik", "news"), ("🔍 Tahlil",   "analysis")],
-        [("🤖 ML Tahlil", "ml"),  ("📈 Aniqlik",  "accuracy")],
-        [("⚙️ Holat", "status"),  ("❓ Yordam",   "help")],
+        [("💰 Narx", "price"),      ("📊 Signal",   "signal")],
+        [("📰 Yangilik", "news"),   ("🔍 Tahlil",   "analysis")],
+        [("🔮 Forecast", "forecast"), ("💼 Hisob",  "account")],
+        [("🤖 ML Tahlil", "ml"),    ("📈 Aniqlik",  "accuracy")],
+        [("⚙️ Holat", "status"),    ("❓ Yordam",   "help")],
     )
     send(chat_id, "🏠 *Bosh Menyu* — kerakli bo'limni tanlang:", buttons=kb)
 
@@ -272,7 +289,7 @@ def _handle_help(chat_id: str) -> None:
     kb = _kb(
         [("💰 Narx", "price"),    ("📊 Signal", "signal")],
         [("🤖 ML Tahlil", "ml"),  ("📈 Aniqlik", "accuracy")],
-        [("⚠️ Patternlar", "patterns"), ("🔁 Retrain", "retrain")],
+        [("🔮 Forecast", "forecast"), ("💼 Hisob", "account")],
         [("🏠 Bosh Menyu", "menu")],
     )
     send(chat_id,
@@ -282,6 +299,8 @@ def _handle_help(chat_id: str) -> None:
          "/signal — Yangi signal\n"
          "/news — So'nggi yangiliklar\n"
          "/analysis — TA + SMC tahlil\n"
+         "/forecast — 24 soatlik prognoz\n"
+         "/account — Hisob holati va risk\n"
          "/ml — ML prediction va model holati\n"
          "/accuracy — ML aniqlik statistikasi\n"
          "/patterns — Xato pattern tahlili\n"
@@ -292,7 +311,7 @@ def _handle_help(chat_id: str) -> None:
 
 def _handle_price(chat_id: str) -> None:
     try:
-        r      = httpx.get("http://localhost:8001/api/v1/market-data/price",
+        r      = httpx.get(_INTERNAL_URL + "/api/v1/market-data/price",
                             params={"symbol": "XAUUSD"}, timeout=10)
         d      = r.json()
         price  = d.get("price") or 0.0
@@ -312,7 +331,7 @@ def _handle_price(chat_id: str) -> None:
 def _handle_signal(chat_id: str) -> None:
     send(chat_id, "⏳ Signal generatsiya qilinmoqda...")
     try:
-        r = httpx.post("http://localhost:8001/api/v1/signals/generate",
+        r = httpx.post(_INTERNAL_URL + "/api/v1/signals/generate",
                        json={"symbol": "XAUUSD", "timeframe": "60"}, timeout=30)
         if r.status_code != 200:
             send(chat_id, f"⚠️ Signal xatosi: {r.text[:200]}",
@@ -326,7 +345,7 @@ def _handle_signal(chat_id: str) -> None:
 
 def _handle_news(chat_id: str) -> None:
     try:
-        r     = httpx.get("http://localhost:8001/api/v1/news",
+        r     = httpx.get(_INTERNAL_URL + "/api/v1/news",
                            params={"limit": 5}, timeout=10)
         items = r.json()
         if not items:
@@ -345,9 +364,9 @@ def _handle_news(chat_id: str) -> None:
 
 def _handle_analysis(chat_id: str) -> None:
     try:
-        snap = httpx.get("http://localhost:8001/api/v1/indicators/snapshot",
+        snap = httpx.get(_INTERNAL_URL + "/api/v1/indicators/snapshot",
                          params={"symbol": "XAUUSD", "timeframe": "60"}, timeout=15).json()
-        smc  = httpx.get("http://localhost:8001/api/v1/smc/score",
+        smc  = httpx.get(_INTERNAL_URL + "/api/v1/smc/score",
                          params={"symbol": "XAUUSD", "timeframe": "60"}, timeout=15).json()
 
         rsi   = snap.get("rsi") or 50.0
@@ -393,7 +412,7 @@ def _handle_ml(chat_id: str) -> None:
     send(chat_id, "⏳ ML prediction yuklanmoqda...")
     try:
         r = httpx.post(
-            "http://localhost:8001/api/v1/ml/predict",
+            _INTERNAL_URL + "/api/v1/ml/predict",
             json={"symbol": "XAUUSD", "timeframe": "60"},
             timeout=20,
         )
@@ -418,7 +437,7 @@ def _handle_ml(chat_id: str) -> None:
 
         # Tarix oxirgisini ham ko'rsatamiz
         hist_r = httpx.get(
-            "http://localhost:8001/api/v1/ml/feedback/history",
+            _INTERNAL_URL + "/api/v1/ml/feedback/history",
             params={"symbol": "XAUUSD", "timeframe": "60", "limit": 3},
             timeout=10,
         )
@@ -459,7 +478,7 @@ def _handle_accuracy(chat_id: str) -> None:
     """ML aniqlik statistikasi — session bo'yicha."""
     try:
         r = httpx.get(
-            "http://localhost:8001/api/v1/ml/feedback/accuracy",
+            _INTERNAL_URL + "/api/v1/ml/feedback/accuracy",
             params={"symbol": "XAUUSD", "timeframe": "60", "last_n": 100},
             timeout=10,
         )
@@ -506,7 +525,7 @@ def _handle_patterns(chat_id: str) -> None:
     """Xato prediction patternlari — MLTrainer penalty uchun."""
     try:
         r = httpx.get(
-            "http://localhost:8001/api/v1/ml/feedback/error-patterns",
+            _INTERNAL_URL + "/api/v1/ml/feedback/error-patterns",
             params={"symbol": "XAUUSD", "timeframe": "60", "min_occurrences": 2},
             timeout=10,
         )
@@ -549,7 +568,7 @@ def _handle_retrain(chat_id: str) -> None:
     send(chat_id, "🔁 Model qayta o'qitilmoqda... Bu 30–60 soniya olishi mumkin.")
     try:
         r = httpx.post(
-            "http://localhost:8001/api/v1/ml/feedback/retrain",
+            _INTERNAL_URL + "/api/v1/ml/feedback/retrain",
             params={"symbol": "XAUUSD", "timeframe": "60"},
             timeout=120,
         )
@@ -591,7 +610,7 @@ def _handle_retrain(chat_id: str) -> None:
 
 def _handle_status(chat_id: str) -> None:
     try:
-        health = httpx.get("http://localhost:8001/api/v1/health", timeout=5).json()
+        health = httpx.get(_INTERNAL_URL + "/api/v1/health", timeout=5).json()
         ok     = health.get("status") == "ok"
         chats  = len(get_registered_chats())
         stats  = get_filter_stats()
@@ -608,6 +627,101 @@ def _handle_status(chat_id: str) -> None:
              buttons=kb)
     except Exception:
         send(chat_id, "❌ Backend bilan bog'lanib bo'lmadi.", buttons=_kb(_MENU_ROW))
+
+
+def _handle_forecast(chat_id: str) -> None:
+    """24-soatlik XAUUSD forecast."""
+    send(chat_id, "⏳ Forecast yuklanmoqda...")
+    try:
+        r = httpx.get(
+            _INTERNAL_URL + "/api/v1/forecast",
+            params={"symbol": "XAUUSD", "timeframe": "60"},
+            timeout=20,
+        )
+        d = r.json() if r.status_code == 200 else {}
+
+        direction  = d.get("direction", "neutral")
+        confidence = float(d.get("confidence") or 0)
+        price_now  = d.get("current_price") or d.get("price") or 0
+        tp1        = d.get("target_1") or d.get("take_profit_1")
+        tp2        = d.get("target_2") or d.get("take_profit_2")
+        sl_lvl     = d.get("stop_loss")
+        regime     = d.get("regime") or d.get("market_regime", "—")
+        summary    = (d.get("summary") or d.get("reasoning") or "")[:200]
+
+        dir_em = "🟢" if direction in ("bullish", "BUY") else (
+            "🔴" if direction in ("bearish", "SELL") else "⚪"
+        )
+
+        def _f(v): return f"{float(v):.2f}" if v is not None else "—"
+
+        kb = _kb(
+            [("🔄 Yangilash", "forecast"), ("📊 Signal", "signal")],
+            _MENU_ROW,
+        )
+        send(chat_id,
+             f"🔮 *XAUUSD 24H Forecast*\n\n"
+             f"Yo'nalish: {dir_em} *{direction.upper()}*\n"
+             f"Ishonch: `{confidence:.1f}%`\n"
+             f"Joriy narx: `{_f(price_now)}`\n\n"
+             f"*Maqsadlar*\n"
+             f"TP1: `{_f(tp1)}` | TP2: `{_f(tp2)}`\n"
+             f"SL:  `{_f(sl_lvl)}`\n\n"
+             f"*Bozor rejimi:* `{regime}`\n\n"
+             f"_{summary}_\n\n"
+             f"_{datetime.utcnow().strftime('%d %b %H:%M UTC')}_",
+             buttons=kb)
+
+    except Exception as exc:
+        send(chat_id, f"⚠️ Forecast xatosi: {exc}", buttons=_kb(_MENU_ROW))
+
+
+def _handle_account(chat_id: str) -> None:
+    """Hisob holati va risk ko'rsatkichlari."""
+    try:
+        r = httpx.get(_INTERNAL_URL + "/api/v1/risk/status", timeout=10)
+        d = r.json() if r.status_code == 200 else {}
+
+        can_r = httpx.get(_INTERNAL_URL + "/api/v1/risk/can-trade",
+                          params={"symbol": "XAUUSD"}, timeout=5)
+        can_d = can_r.json() if can_r.status_code == 200 else {}
+
+        allowed     = can_d.get("allowed", True)
+        trade_em    = "✅" if allowed else "🚫"
+        reasons     = can_d.get("reasons", [])
+
+        balance     = d.get("balance") or d.get("account_balance", 0)
+        daily_pnl   = float(d.get("daily_pnl") or 0)
+        weekly_pnl  = float(d.get("weekly_pnl") or 0)
+        open_trades = int(d.get("open_trades") or 0)
+        daily_loss  = float(d.get("daily_loss_pct") or 0)
+        weekly_loss = float(d.get("weekly_loss_pct") or 0)
+
+        pnl_em = "🟢" if daily_pnl >= 0 else "🔴"
+        wpnl_em = "🟢" if weekly_pnl >= 0 else "🔴"
+
+        lines = [
+            "💼 *Hisob Holati*\n",
+            f"Balans: `${float(balance or 0):,.2f}`",
+            f"Ochiq pozitsiyalar: `{open_trades}`",
+            f"\n*Kunlik / Haftalik P&L*",
+            f"{pnl_em} Kunlik:   `{daily_pnl:+.2f}$` ({daily_loss:.1f}%)",
+            f"{wpnl_em} Haftalik: `{weekly_pnl:+.2f}$` ({weekly_loss:.1f}%)",
+            f"\n*Savdo holati*: {trade_em} {'Savdo mumkin' if allowed else 'Savdo bloklandi'}",
+        ]
+        if reasons:
+            lines.append("Sabab: " + "; ".join(reasons))
+
+        lines.append(f"\n_{datetime.utcnow().strftime('%H:%M UTC')}_")
+
+        kb = _kb(
+            [("🔄 Yangilash", "account"), ("📊 Signal", "signal")],
+            _MENU_ROW,
+        )
+        send(chat_id, "\n".join(lines), buttons=kb)
+
+    except Exception as exc:
+        send(chat_id, f"⚠️ Hisob xatosi: {exc}", buttons=_kb(_MENU_ROW))
 
 
 def _escape_md(text: str) -> str:
@@ -776,6 +890,8 @@ _COMMANDS = {
     "/accuracy": _handle_accuracy,
     "/patterns": _handle_patterns,
     "/retrain":  _handle_retrain,
+    "/forecast": _handle_forecast,
+    "/account":  _handle_account,
 }
 
 _CALLBACKS = {
@@ -790,6 +906,8 @@ _CALLBACKS = {
     "accuracy": _handle_accuracy,
     "patterns": _handle_patterns,
     "retrain":  _handle_retrain,
+    "forecast": _handle_forecast,
+    "account":  _handle_account,
 }
 
 _polling_thread: Optional[threading.Thread] = None

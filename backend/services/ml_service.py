@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 import os
 import pickle
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -16,6 +16,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 
 from config import settings
+from core.constants import ML_FEATURE_NAMES
 from services.indicator_service import build_ml_features
 from services import smc_service
 
@@ -31,13 +32,6 @@ def _build_dataset(candles: List[Dict[str, Any]]) -> Tuple[List[List[float]], Li
     """Build feature matrix X and label vector y."""
     X: List[List[float]] = []
     y: List[int] = []
-    FEATURE_NAMES = [
-        "rsi", "macd", "macd_signal", "macd_hist",
-        "ema_20_dist", "ema_50_dist", "ema_200_dist",
-        "atr_pct", "bb_position",
-        "candle_body_ratio", "upper_wick_ratio", "lower_wick_ratio",
-        "volume_ratio", "smc_score",
-    ]
 
     for i in range(50, len(candles) - 5):
         window = candles[:i + 1]
@@ -56,7 +50,7 @@ def _build_dataset(candles: List[Dict[str, Any]]) -> Tuple[List[List[float]], Li
         else:
             label = 0
 
-        X.append([feats.get(k, 0.0) for k in FEATURE_NAMES])
+        X.append([feats.get(k, 0.0) for k in ML_FEATURE_NAMES])
         y.append(label)
 
     return X, y
@@ -86,7 +80,7 @@ def train(symbol: str, timeframe: str, candles: List[Dict[str, Any]]) -> Dict[st
 
     path = _model_path(symbol, timeframe)
     with open(path, "wb") as f:
-        pickle.dump({"model": model, "accuracy": acc, "trained_at": datetime.utcnow().isoformat()}, f)
+        pickle.dump({"model": model, "accuracy": acc, "trained_at": datetime.now(timezone.utc).isoformat()}, f)
 
     log.info("Trained model for %s %s: acc=%.3f samples=%d", symbol, timeframe, acc, len(X))
     return {
@@ -133,15 +127,7 @@ def predict(symbol: str, timeframe: str, candles: List[Dict[str, Any]]) -> Dict[
             "message": "Not enough indicator features for ML prediction. Try a longer range.",
         }
 
-    FEATURE_NAMES = [
-        "rsi", "macd", "macd_signal", "macd_hist",
-        "ema_20_dist", "ema_50_dist", "ema_200_dist",
-        "atr_pct", "bb_position",
-        "candle_body_ratio", "upper_wick_ratio", "lower_wick_ratio",
-        "volume_ratio", "smc_score",
-    ]
-
-    x = np.array([[features.get(k, 0.0) for k in FEATURE_NAMES]])
+    x = np.array([[features.get(k, 0.0) for k in ML_FEATURE_NAMES]])
     model = model_data["model"]
     pred = int(model.predict(x)[0])
     proba = model.predict_proba(x)[0]

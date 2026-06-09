@@ -1,12 +1,15 @@
 __pycache__/
 *.pyc
 .env
+.env.local
+.env.*.local
 .venv
 venv
-tests/
 *.sqlite3
 dev.db
 .git
+.github
 frontend/node_modules
 frontend/.next
 models/
+docs/

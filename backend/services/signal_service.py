@@ -8,30 +8,25 @@ from __future__ import annotations
 import logging
 import os
 import pickle
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
 from config import settings
+from core.constants import ML_FEATURE_NAMES, W_TECHNICAL, W_SMC, W_ML, W_NEWS, W_ECONOMIC
 from services.indicator_service import compute_snapshot, build_ml_features
 from services import smc_service
 
 log = logging.getLogger(__name__)
 
-_W_TECH = 0.35
-_W_SMC  = 0.25
-_W_ML   = 0.20
-_W_NEWS = 0.10
-_W_ECON = 0.10
+_W_TECH = W_TECHNICAL
+_W_SMC  = W_SMC
+_W_ML   = W_ML
+_W_NEWS = W_NEWS
+_W_ECON = W_ECONOMIC
 
-_FEATURE_NAMES = [
-    "rsi", "macd", "macd_signal", "macd_hist",
-    "ema_20_dist", "ema_50_dist", "ema_200_dist",
-    "atr_pct", "bb_position",
-    "candle_body_ratio", "upper_wick_ratio", "lower_wick_ratio",
-    "volume_ratio", "smc_score",
-]
+_FEATURE_NAMES = ML_FEATURE_NAMES
 
 
 # ── structural levels ─────────────────────────────────────────────────────────
@@ -192,7 +187,7 @@ def _ml_score(symbol: str, timeframe: str, candles: List[Dict]) -> Tuple[float, 
     if not feats:
         return 50.0, ["ML features unavailable"]
 
-    x     = np.array([[feats.get(k, 0.0) for k in _FEATURE_NAMES]])
+    x     = np.array([[feats.get(k, 0.0) for k in ML_FEATURE_NAMES]])
     model = model_data["model"]
     proba = model.predict_proba(x)[0]
     pct   = {int(cls): float(p) * 100 for cls, p in zip(model.classes_, proba)}
@@ -237,9 +232,9 @@ def generate_signal(
         1,
     )
 
-    if combined >= 62:
+    if combined >= settings.SIGNAL_BUY_THRESHOLD:
         signal_type = "BUY"
-    elif combined <= 38:
+    elif combined <= settings.SIGNAL_SELL_THRESHOLD:
         signal_type = "SELL"
     else:
         signal_type = "NEUTRAL"
@@ -275,7 +270,7 @@ def generate_signal(
         "economic_score":  round(economic_score, 1),
         "combined_score":  combined,
         "reasoning":       reasoning,
-        "created_at":      datetime.utcnow(),
+        "created_at":      datetime.now(timezone.utc),
     }
 
 
@@ -284,9 +279,6 @@ def enrich_signal(result: Dict[str, Any], account_balance: float = 10000.0) -> D
     Adds lot_size, risk_amount_usd, distance fields, plain_explanation, signal_emoji.
     Mutates and returns result.
     """
-    import sys
-    import os as _os
-    sys.path.insert(0, _os.path.join(_os.path.dirname(__file__), "..", ".."))
     from src.risk_management.calculator import risk_calculator
 
     signal_type = result.get("signal_type", "NEUTRAL")
