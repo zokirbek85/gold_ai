@@ -3,7 +3,7 @@ AI analysis router — template-based analysis (no external LLM required).
 """
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -230,3 +230,31 @@ def daily_bias(payload: DailyBiasIn) -> Dict[str, Any]:
         "signals":       signals,
         "key_levels":    [],
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GOLD_AI — Elite 8-step analysis pipeline
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/analyze")
+def gold_ai_analyze(
+    symbol: str = Query("XAUUSD"),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Run the full GOLD_AI 8-step pipeline:
+      1 Blackout check  2 Regime  3 Macro filter  4 Liquidity sweep
+      5 Session quality  6 Online learning  7 Confluence scoring  8 Signal construction
+
+    Returns the complete JSON output including signals for all 7 timeframes,
+    priority signal, risk dashboard, and online learning update.
+    """
+    try:
+        from services.gold_ai_engine import analyze
+        return analyze(db, symbol=symbol)
+    except Exception as exc:
+        import traceback
+        import logging
+        logging.getLogger(__name__).error("GOLD_AI analyze error: %s\n%s",
+                                          exc, traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(exc))

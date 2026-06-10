@@ -265,6 +265,67 @@ def analyze(candles: list) -> Dict[str, Any]:
     }
 
 
+def detect_liquidity_sweep(candles: list) -> Dict[str, Any]:
+    """
+    Detect whether price just swept a recent liquidity pool (equal high/low)
+    and whether a reversal candle is forming.
+
+    Returns:
+      {
+        "detected": bool,
+        "type": "buy_side|sell_side|none",
+        "swept_level": float,
+        "reversal_forming": bool,
+      }
+    """
+    empty = {"detected": False, "type": "none", "swept_level": 0.0, "reversal_forming": False}
+    if len(candles) < 20:
+        return empty
+
+    window = candles[-50:]
+    highs  = _highs(window)
+    lows   = _lows(window)
+    closes = _closes(window)
+    opens  = _opens(window)
+
+    # Look for equal highs (sell-side liquidity) in the lookback window (excluding last 3)
+    lookback_highs = highs[:-3]
+    lookback_lows  = lows[:-3]
+    recent_high = max(lookback_highs) if lookback_highs else 0.0
+    recent_low  = min(lookback_lows)  if lookback_lows  else float("inf")
+
+    last_high  = highs[-1]
+    last_low   = lows[-1]
+    last_close = closes[-1]
+    last_open  = opens[-1]
+    prev_close = closes[-2]
+
+    tolerance = (recent_high - recent_low) * 0.001
+
+    # Sell-side liquidity sweep: price briefly exceeded equal-highs then closed back below
+    if last_high > recent_high - tolerance and last_close < recent_high:
+        # Bearish reversal candle check: close < open (bearish candle) and closed below the swept level
+        reversal = last_close < last_open and last_close < recent_high
+        return {
+            "detected": True,
+            "type": "sell_side",
+            "swept_level": round(recent_high, 4),
+            "reversal_forming": reversal,
+        }
+
+    # Buy-side liquidity sweep: price briefly went below equal-lows then closed back above
+    if last_low < recent_low + tolerance and last_close > recent_low:
+        reversal = last_close > last_open and last_close > recent_low
+        return {
+            "detected": True,
+            "type": "buy_side",
+            "swept_level": round(recent_low, 4),
+            "reversal_forming": reversal,
+        }
+
+    return empty
+
+
 def score(candles: list) -> Dict[str, Any]:
     """SMC score 0-100, shaped for /smc/score endpoint."""
     if len(candles) < 10:
