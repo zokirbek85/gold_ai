@@ -61,8 +61,7 @@ def train(symbol: str, timeframe: str, candles: List[Dict[str, Any]]) -> Dict[st
     if len(candles) < 200:
         return {"status": "error", "message": "Need at least 200 candles", "accuracy": 0.0, "samples": 0}
 
-    training_candles = candles[-1000:]
-    X, y = _build_dataset(training_candles)
+    X, y = _build_dataset(candles)
 
     if len(X) < 50:
         return {"status": "error", "message": "Not enough samples after feature engineering", "accuracy": 0.0, "samples": len(X)}

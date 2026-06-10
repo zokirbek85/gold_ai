@@ -99,6 +99,59 @@ def _initial_ingest() -> None:
     finally:
         db.close()
 
+    # After ingestion, auto-train ML models for any timeframe that has no saved model
+    _auto_train_missing_models()
+
+
+def _auto_train_missing_models() -> None:
+    """Train ML models for timeframes that have no .pkl file yet, using all DB candles."""
+    import os
+    from database import SessionLocal
+    from models.candle import Candle
+    from services import ml_service
+    from config import settings
+
+    # GOLD_AI uses these 7 timeframes; prioritise H1 and H4 first
+    TIMEFRAMES = ["60", "240", "15", "1440", "5", "30", "1"]
+
+    db = SessionLocal()
+    try:
+        for tf in TIMEFRAMES:
+            model_path = os.path.join(settings.ML_MODEL_DIR, f"xauusd_{tf}.pkl")
+            if os.path.exists(model_path):
+                log.info("ML model already exists for XAUUSD/%s — skipping auto-train", tf)
+                continue
+
+            rows = (
+                db.query(Candle)
+                .filter(Candle.symbol == "XAUUSD", Candle.timeframe == tf)
+                .order_by(Candle.timestamp.asc())
+                .all()
+            )
+            candles = [
+                {"open": r.open, "high": r.high, "low": r.low,
+                 "close": r.close, "volume": r.volume}
+                for r in rows
+            ]
+
+            if len(candles) < 200:
+                log.info("Not enough candles for XAUUSD/%s (%d) — skipping auto-train", tf, len(candles))
+                continue
+
+            log.info("Auto-training ML for XAUUSD/%s using %d candles…", tf, len(candles))
+            try:
+                result = ml_service.train("XAUUSD", tf, candles)
+                log.info(
+                    "Auto-train XAUUSD/%s done: status=%s samples=%s accuracy=%s",
+                    tf, result.get("status"), result.get("samples"), result.get("accuracy"),
+                )
+            except Exception:
+                log.exception("Auto-train failed for XAUUSD/%s", tf)
+    except Exception:
+        log.exception("_auto_train_missing_models failed")
+    finally:
+        db.close()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

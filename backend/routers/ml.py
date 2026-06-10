@@ -51,7 +51,7 @@ def _to_dicts(rows) -> list:
     return result
 
 
-def _db_candles_for_tf(db: Session, symbol: str, timeframe: str, limit: int = 1000) -> list:
+def _db_candles_for_tf(db: Session, symbol: str, timeframe: str, limit: int = 20_000) -> list:
     """Load candles from DB for a given timeframe."""
     return (
         db.query(Candle)
@@ -62,9 +62,10 @@ def _db_candles_for_tf(db: Session, symbol: str, timeframe: str, limit: int = 10
     )
 
 
-def _refresh_and_load(db: Session, symbol: str, timeframe: str, limit: int = 1000) -> list:
+def _refresh_and_load(db: Session, symbol: str, timeframe: str, limit: int = 20_000) -> list:
     """Fetch latest candles from Twelvedata, upsert, return all from DB."""
     interval = TF_TO_TD.get(str(timeframe), "1h")
+    # Twelvedata API caps at 5000 per request; fetch the most recent batch only
     fresh = fetch_twelvedata(symbol, interval, min(limit, 500))
     if fresh:
         upsert_candles(db, symbol, timeframe, fresh)
@@ -115,7 +116,7 @@ def train(payload: TrainIn, db: Session = Depends(get_db)) -> Dict[str, Any]:
         timeframe = payload.timeframe
 
     # Refresh from Twelvedata then load all DB candles for this timeframe
-    db_rows = _refresh_and_load(db, payload.symbol, timeframe, 1000)
+    db_rows = _refresh_and_load(db, payload.symbol, timeframe, 20_000)
     candles = _to_dicts(db_rows)
 
     if len(candles) < 100:
@@ -193,7 +194,7 @@ def _run_training_job(job_id: str, symbol: str, timeframe: str, days: int) -> No
     })
     db = SessionLocal()
     try:
-        rows = _refresh_and_load(db, symbol, timeframe, min(days * 24, 5000))
+        rows = _refresh_and_load(db, symbol, timeframe, days * 24)
         candles = _to_dicts(rows)
         if len(candles) < 100:
             _set_job(job_id, {
