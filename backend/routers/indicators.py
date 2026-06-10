@@ -36,7 +36,7 @@ def indicator_snapshot(
     if len(candles) < 26:
         raise HTTPException(
             status_code=422,
-            detail="Not enough fresh historical data. Check TWELVEDATA_API_KEY or try a longer range.",
+            detail=f"Insufficient data ({len(candles)} candles, need 26+). Set TWELVEDATA_API_KEY in .env or use a longer timeframe.",
         )
     return compute_snapshot(candles)
 

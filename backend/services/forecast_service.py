@@ -237,48 +237,59 @@ def _ml_projection(symbol: str, timeframe: str, candles: List[Dict]) -> Dict[str
     try:
         with open(path, "rb") as f:
             model_data = pickle.load(f)
-    except Exception:
+    except Exception as e:
+        log.debug(f"Failed to load ML model for {symbol}/{timeframe}: {e}")
         return empty
 
-    smc_val = smc_service.score(candles[-100:]).get("score", 50) if len(candles) >= 100 else 50.0
+    # Calculate SMC score with error handling
+    try:
+        smc_val = smc_service.score(candles[-100:]).get("score", 50) if len(candles) >= 100 else 50.0
+    except Exception as e:
+        log.debug(f"SMC score calculation failed: {e}")
+        smc_val = 50.0
+        
     feats   = build_ml_features(candles, smc_score=smc_val)
     if not feats:
         return empty
 
-    x     = np.array([[feats.get(k, 0.0) for k in _ML_FEATURES]])
-    proba = model_data["model"].predict_proba(x)[0]
-    pct   = {int(cls): float(p) * 100 for cls, p in zip(model_data["model"].classes_, proba)}
-    buy_p = pct.get(1, 0.0)
-    sel_p = pct.get(-1, 0.0)
+    try:
+        x     = np.array([[feats.get(k, 0.0) for k in _ML_FEATURES]])
+        proba = model_data["model"].predict_proba(x)[0]
+        pct   = {int(cls): float(p) * 100 for cls, p in zip(model_data["model"].classes_, proba)}
+        buy_p = pct.get(1, 0.0)
+        sel_p = pct.get(-1, 0.0)
 
-    if buy_p > sel_p and buy_p > 38:
-        direction, strength = "bullish", buy_p / 100
-    elif sel_p > buy_p and sel_p > 38:
-        direction, strength = "bearish", sel_p / 100
-    else:
-        direction, strength = "neutral", 0.1
+        if buy_p > sel_p and buy_p > 38:
+            direction, strength = "bullish", buy_p / 100
+        elif sel_p > buy_p and sel_p > 38:
+            direction, strength = "bearish", sel_p / 100
+        else:
+            direction, strength = "neutral", 0.1
 
-    atr_val = _atr(candles)
-    last_ts = _ts(candles[-1]["timestamp"])
-    last_px = float(candles[-1]["close"])
-    tf_sec  = TF_MINUTES.get(str(timeframe), 60) * 60
-    sign    = 1 if direction == "bullish" else (-1 if direction == "bearish" else 0)
-    step    = atr_val * strength * 0.45
+        atr_val = _atr(candles)
+        last_ts = _ts(candles[-1]["timestamp"])
+        last_px = float(candles[-1]["close"])
+        tf_sec  = TF_MINUTES.get(str(timeframe), 60) * 60
+        sign    = 1 if direction == "bullish" else (-1 if direction == "bearish" else 0)
+        step    = atr_val * strength * 0.45
 
-    projection = [{"time": last_ts, "value": round(last_px, 4)}]
-    price = last_px
-    for i in range(1, 8):
-        taper  = max(0.25, 1.0 - i * 0.1)
-        price += sign * step * taper
-        projection.append({"time": last_ts + tf_sec * i, "value": round(price, 4)})
+        projection = [{"time": last_ts, "value": round(last_px, 4)}]
+        price = last_px
+        for i in range(1, 8):
+            taper  = max(0.25, 1.0 - i * 0.1)
+            price += sign * step * taper
+            projection.append({"time": last_ts + tf_sec * i, "value": round(price, 4)})
 
-    return {
-        "direction": direction,
-        "confidence": round(max(buy_p, sel_p), 1),
-        "buy_pct":  round(buy_p, 1),
-        "sell_pct": round(sel_p, 1),
-        "projection": projection,
-    }
+        return {
+            "direction": direction,
+            "confidence": round(max(buy_p, sel_p), 1),
+            "buy_pct":  round(buy_p, 1),
+            "sell_pct": round(sel_p, 1),
+            "projection": projection,
+        }
+    except Exception as e:
+        log.error(f"ML prediction failed for {symbol}/{timeframe}: {e}")
+        return empty
 
 
 # ── main entry ────────────────────────────────────────────────────────────────
@@ -294,27 +305,38 @@ def generate_forecast(db: Session, symbol: str, timeframe: str) -> Dict[str, Any
     # Refresh news and economic calendar so historical event data is current
     try:
         refresh_news(db)
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"News refresh failed: {e}")
+        db.rollback()
     try:
         refresh_calendar(db)
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Calendar refresh failed: {e}")
+        db.rollback()
 
     # Refresh candles from Twelvedata
-    interval = TF_TO_TD.get(str(timeframe), "1h")
-    fresh = fetch_twelvedata(symbol, interval, 300)
-    if fresh:
-        upsert_candles(db, symbol, timeframe, fresh)
+    try:
+        interval = TF_TO_TD.get(str(timeframe), "1h")
+        fresh = fetch_twelvedata(symbol, interval, 300)
+        if fresh:
+            upsert_candles(db, symbol, timeframe, fresh)
+    except Exception as e:
+        log.warning(f"Twelvedata fetch failed for {symbol}/{timeframe}: {e}")
+        db.rollback()
 
-    rows = (
-        db.query(Candle)
-        .filter(Candle.symbol == symbol, Candle.timeframe == str(timeframe))
-        .order_by(Candle.timestamp.desc())
-        .limit(300)
-        .all()
-    )
-    rows = list(reversed(rows))
+    try:
+        rows = (
+            db.query(Candle)
+            .filter(Candle.symbol == symbol, Candle.timeframe == str(timeframe))
+            .order_by(Candle.timestamp.desc())
+            .limit(300)
+            .all()
+        )
+        rows = list(reversed(rows))
+    except Exception as e:
+        log.error(f"Database query failed for {symbol}/{timeframe}: {e}")
+        return {"error": "Database error retrieving candle data"}
+        
     if not rows:
         return {"error": "No candle data available"}
 
@@ -338,61 +360,116 @@ def generate_forecast(db: Session, symbol: str, timeframe: str) -> Dict[str, Any
         for c in candles
     ]
 
-    # Indicator series
-    bb = _bb_lines(candles)
-    indicators = {
-        "ema_20":   _ema_line(candles, 20),
-        "ema_50":   _ema_line(candles, 50),
-        "ema_200":  _ema_line(candles, 200),
-        "bb_upper": bb["upper"],
-        "bb_middle": bb["middle"],
-        "bb_lower": bb["lower"],
-        "rsi":      _rsi_line(candles),
-    }
+    # Indicator series with error handling
+    try:
+        bb = _bb_lines(candles)
+        indicators = {
+            "ema_20":   _ema_line(candles, 20),
+            "ema_50":   _ema_line(candles, 50),
+            "ema_200":  _ema_line(candles, 200),
+            "bb_upper": bb["upper"],
+            "bb_middle": bb["middle"],
+            "bb_lower": bb["lower"],
+            "rsi":      _rsi_line(candles),
+        }
+    except Exception as e:
+        log.error(f"Indicator calculation failed: {e}")
+        indicators = {
+            "ema_20": [], "ema_50": [], "ema_200": [],
+            "bb_upper": [], "bb_middle": [], "bb_lower": [],
+            "rsi": []
+        }
 
-    # Overlays
-    obs  = _order_blocks_with_time(candles)
-    fvgs = _fvg_with_time(candles)
-    sr   = _support_resistance(candles[-100:])
-    fib  = _fibonacci(candles)
+    # Overlays with error handling
+    try:
+        obs  = _order_blocks_with_time(candles)
+    except Exception as e:
+        log.error(f"Order block detection failed: {e}")
+        obs = []
+        
+    try:
+        fvgs = _fvg_with_time(candles)
+    except Exception as e:
+        log.error(f"FVG detection failed: {e}")
+        fvgs = []
+        
+    try:
+        sr   = _support_resistance(candles[-100:])
+    except Exception as e:
+        log.error(f"Support/resistance detection failed: {e}")
+        sr = []
+        
+    try:
+        fib  = _fibonacci(candles)
+    except Exception as e:
+        log.error(f"Fibonacci calculation failed: {e}")
+        fib = {}
 
-    # Historical analysis
-    current_month = datetime.utcnow().month
-    seasonality   = monthly_seasonality(db, symbol, current_month)
-    event_impact  = event_impact_analysis(
-        db, symbol,
-        ["nfp", "non-farm", "cpi", "inflation", "fomc", "fed rate"],
-    )
+    # Historical analysis with error handling
+    seasonality = {}
+    try:
+        current_month = datetime.utcnow().month
+        seasonality = monthly_seasonality(db, symbol, current_month)
+    except Exception as e:
+        log.error(f"Seasonality analysis failed: {e}")
+        seasonality = {"insufficient_data": True}
+        
+    event_impact = {}
+    try:
+        event_impact = event_impact_analysis(
+            db, symbol,
+            ["nfp", "non-farm", "cpi", "inflation", "fomc", "fed rate"],
+        )
+    except Exception as e:
+        log.error(f"Event impact analysis failed: {e}")
+        event_impact = {}
+        
     # Find nearest S/R level for zone analysis
-    current_price = float(candles[-1]["close"])
-    nearest_zone  = min(sr, key=lambda x: abs(x["level"] - current_price), default=None)
-    zone_analysis = (
-        zone_test_analysis(db, symbol, nearest_zone["level"])
-        if nearest_zone else {"insufficient_data": True}
-    )
+    zone_analysis = {}
+    try:
+        current_price = float(candles[-1]["close"])
+        nearest_zone  = min(sr, key=lambda x: abs(x["level"] - current_price), default=None)
+        zone_analysis = (
+            zone_test_analysis(db, symbol, nearest_zone["level"])
+            if nearest_zone else {"insufficient_data": True}
+        )
+    except Exception as e:
+        log.error(f"Zone analysis failed: {e}")
+        zone_analysis = {"insufficient_data": True}
 
-    # Signal markers from DB
-    db_sigs = (
-        db.query(Signal)
-        .filter(Signal.symbol == symbol, Signal.signal_type.in_(["BUY", "SELL"]))
-        .order_by(Signal.created_at.desc())
-        .limit(15)
-        .all()
-    )
-    signal_markers = [
-        {"time": _ts(s.created_at), "type": s.signal_type,
-         "price": s.entry, "sl": s.stop_loss, "tp": s.take_profit, "confidence": s.confidence}
-        for s in db_sigs if s.entry
-    ]
+    # Signal markers from DB with error handling
+    signal_markers = []
+    latest_signal = None
+    try:
+        db_sigs = (
+            db.query(Signal)
+            .filter(Signal.symbol == symbol, Signal.signal_type.in_(["BUY", "SELL"]))
+            .order_by(Signal.created_at.desc())
+            .limit(15)
+            .all()
+        )
+        signal_markers = [
+            {"time": _ts(s.created_at), "type": s.signal_type,
+             "price": s.entry, "sl": s.stop_loss, "tp": s.take_profit, "confidence": s.confidence}
+            for s in db_sigs if s.entry
+        ]
 
-    latest_sig = db_sigs[0] if db_sigs else None
-    latest_signal = {
-        "type": latest_sig.signal_type, "entry": latest_sig.entry,
-        "sl": latest_sig.stop_loss, "tp": latest_sig.take_profit,
-        "confidence": latest_sig.confidence, "rr": latest_sig.rr,
-    } if latest_sig else None
+        latest_sig = db_sigs[0] if db_sigs else None
+        latest_signal = {
+            "type": latest_sig.signal_type, "entry": latest_sig.entry,
+            "sl": latest_sig.stop_loss, "tp": latest_sig.take_profit,
+            "confidence": latest_sig.confidence, "rr": latest_sig.rr,
+        } if latest_sig else None
+    except Exception as e:
+        log.error(f"Signal retrieval failed: {e}")
 
-    ml = _ml_projection(symbol, timeframe, candles)
+    # ML projection with error handling
+    ml = {}
+    try:
+        ml = _ml_projection(symbol, timeframe, candles)
+    except Exception as e:
+        log.error(f"ML projection failed: {e}")
+        ml = {"direction": "neutral", "confidence": 0, "buy_pct": 0, "sell_pct": 0, "projection": []}
 
     return {
         "symbol": symbol,
@@ -409,7 +486,7 @@ def generate_forecast(db: Session, symbol: str, timeframe: str) -> Dict[str, Any
         },
         "latest_signal": latest_signal,
         "ml_forecast": ml,
-        "seasonality":    seasonality,
+        "seasonality": seasonality,
         "event_impact":   event_impact,
         "zone_analysis":  zone_analysis,
         "generated_at": datetime.utcnow().isoformat(),
