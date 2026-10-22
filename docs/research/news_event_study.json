@@ -1,0 +1,392 @@
+{
+  "generated_at": "2026-10-22T07:39:55.943542Z",
+  "sources": [
+    "bls.gov/bls/news-release/cpi.htm",
+    "bls.gov/bls/news-release/empsit.htm",
+    "federalreserve.gov/monetarypolicy/fomccalendars.htm"
+  ],
+  "assumptions": {
+    "news_spread_usd": 0.9,
+    "news_slippage_usd": 0.3,
+    "price_feed": "Twelvedata XAU/USD 1min (aggregated, not broker)"
+  },
+  "events_total": 152,
+  "events_with_data": 151,
+  "no_data": [
+    {
+      "kind": "NFP",
+      "date": "2023-04-07",
+      "status": "no_data"
+    }
+  ],
+  "by_event": {
+    "CPI": {
+      "n": 57,
+      "+1m": {
+        "mean_usd": 3.67,
+        "median_usd": 3.29,
+        "mean_abs_usd": 7.86,
+        "up_share": 0.667,
+        "mean_ci95": [
+          1.327,
+          6.045
+        ]
+      },
+      "+5m": {
+        "mean_usd": 3.89,
+        "median_usd": 3.42,
+        "mean_abs_usd": 10.4,
+        "up_share": 0.596,
+        "mean_ci95": [
+          0.307,
+          7.908
+        ]
+      },
+      "+15m": {
+        "mean_usd": 4.83,
+        "median_usd": 5.32,
+        "mean_abs_usd": 12.69,
+        "up_share": 0.684,
+        "mean_ci95": [
+          0.425,
+          9.253
+        ]
+      },
+      "+30m": {
+        "mean_usd": 3.64,
+        "median_usd": 3.53,
+        "mean_abs_usd": 11.9,
+        "up_share": 0.667,
+        "mean_ci95": [
+          -0.496,
+          7.732
+        ]
+      },
+      "+60m": {
+        "mean_usd": 3.57,
+        "median_usd": 3.04,
+        "mean_abs_usd": 14.31,
+        "up_share": 0.579,
+        "mean_ci95": [
+          -1.608,
+          8.852
+        ]
+      },
+      "+120m": {
+        "mean_usd": 4.51,
+        "median_usd": 2.9,
+        "mean_abs_usd": 14.82,
+        "up_share": 0.544,
+        "mean_ci95": [
+          -0.544,
+          9.712
+        ]
+      },
+      "+240m": {
+        "mean_usd": 3.91,
+        "median_usd": 6.19,
+        "mean_abs_usd": 18.33,
+        "up_share": 0.561,
+        "mean_ci95": [
+          -2.226,
+          10.111
+        ]
+      },
+      "range_expansion_x": 5.1,
+      "median_max_1m_range_first5_usd": 10.75,
+      "impulse_continuation_share": 0.509,
+      "impulse_vs_later_corr": 0.046,
+      "by_year_r60_mean": {
+        "2022": 0.87,
+        "2023": 2.07,
+        "2024": -2.12,
+        "2025": 7.02,
+        "2026": 11.62
+      }
+    },
+    "FOMC": {
+      "n": 38,
+      "+1m": {
+        "mean_usd": 1.36,
+        "median_usd": 1.2,
+        "mean_abs_usd": 4.64,
+        "up_share": 0.553,
+        "mean_ci95": [
+          -0.345,
+          3.282
+        ]
+      },
+      "+5m": {
+        "mean_usd": -0.25,
+        "median_usd": -1.22,
+        "mean_abs_usd": 8.14,
+        "up_share": 0.474,
+        "mean_ci95": [
+          -4.376,
+          3.396
+        ]
+      },
+      "+15m": {
+        "mean_usd": -1.52,
+        "median_usd": -0.07,
+        "mean_abs_usd": 11.38,
+        "up_share": 0.5,
+        "mean_ci95": [
+          -8.344,
+          4.145
+        ]
+      },
+      "+30m": {
+        "mean_usd": -1.9,
+        "median_usd": -1.88,
+        "mean_abs_usd": 11.05,
+        "up_share": 0.447,
+        "mean_ci95": [
+          -8.407,
+          3.419
+        ]
+      },
+      "+60m": {
+        "mean_usd": -0.3,
+        "median_usd": 0.07,
+        "mean_abs_usd": 19.71,
+        "up_share": 0.5,
+        "mean_ci95": [
+          -10.354,
+          8.487
+        ]
+      },
+      "+120m": {
+        "mean_usd": -3.77,
+        "median_usd": 2.3,
+        "mean_abs_usd": 25.28,
+        "up_share": 0.526,
+        "mean_ci95": [
+          -16.082,
+          7.904
+        ]
+      },
+      "+240m": {
+        "mean_usd": -19.96,
+        "median_usd": -19.99,
+        "mean_abs_usd": 52.14,
+        "up_share": 0.25,
+        "mean_ci95": [
+          -54.66,
+          16.78
+        ]
+      },
+      "range_expansion_x": 5.41,
+      "median_max_1m_range_first5_usd": 7.63,
+      "impulse_continuation_share": 0.553,
+      "impulse_vs_later_corr": 0.518,
+      "by_year_r60_mean": {
+        "2022": 6.62,
+        "2023": 8.25,
+        "2024": 2.39,
+        "2025": -4.68,
+        "2026": -18.7
+      }
+    },
+    "NFP": {
+      "n": 56,
+      "+1m": {
+        "mean_usd": 0.19,
+        "median_usd": -0.11,
+        "mean_abs_usd": 8.01,
+        "up_share": 0.482,
+        "mean_ci95": [
+          -2.652,
+          3.119
+        ]
+      },
+      "+5m": {
+        "mean_usd": 0.78,
+        "median_usd": 0.77,
+        "mean_abs_usd": 12.0,
+        "up_share": 0.518,
+        "mean_ci95": [
+          -4.095,
+          5.391
+        ]
+      },
+      "+15m": {
+        "mean_usd": 0.83,
+        "median_usd": -0.11,
+        "mean_abs_usd": 13.67,
+        "up_share": 0.464,
+        "mean_ci95": [
+          -4.351,
+          6.191
+        ]
+      },
+      "+30m": {
+        "mean_usd": -1.41,
+        "median_usd": 0.16,
+        "mean_abs_usd": 13.74,
+        "up_share": 0.5,
+        "mean_ci95": [
+          -6.42,
+          3.585
+        ]
+      },
+      "+60m": {
+        "mean_usd": 0.14,
+        "median_usd": 0.95,
+        "mean_abs_usd": 13.41,
+        "up_share": 0.536,
+        "mean_ci95": [
+          -4.765,
+          4.934
+        ]
+      },
+      "+120m": {
+        "mean_usd": 0.0,
+        "median_usd": 1.13,
+        "mean_abs_usd": 18.93,
+        "up_share": 0.545,
+        "mean_ci95": [
+          -7.373,
+          6.773
+        ]
+      },
+      "+240m": {
+        "mean_usd": -3.46,
+        "median_usd": -0.07,
+        "mean_abs_usd": 21.28,
+        "up_share": 0.491,
+        "mean_ci95": [
+          -11.932,
+          3.989
+        ]
+      },
+      "range_expansion_x": 4.95,
+      "median_max_1m_range_first5_usd": 9.88,
+      "impulse_continuation_share": 0.446,
+      "impulse_vs_later_corr": -0.297,
+      "by_year_r60_mean": {
+        "2022": -2.99,
+        "2023": -3.71,
+        "2024": -1.06,
+        "2025": 6.15,
+        "2026": 2.95
+      }
+    }
+  },
+  "rules": {
+    "assumed_cost_usd_per_oz": 1.5,
+    "results": {
+      "FOLLOW": {
+        "train": {
+          "n": 79,
+          "mean_net_usd_per_oz": -1.04,
+          "win_rate": 45.6,
+          "ci95": [
+            -3.178,
+            1.156
+          ],
+          "gross_mean_usd": 0.46
+        },
+        "test": {
+          "n": 72,
+          "mean_net_usd_per_oz": -0.64,
+          "win_rate": 44.4,
+          "ci95": [
+            -5.263,
+            4.002
+          ],
+          "gross_mean_usd": 0.86
+        },
+        "all": {
+          "n": 151,
+          "mean_net_usd_per_oz": -0.85,
+          "win_rate": 45.0,
+          "ci95": [
+            -3.214,
+            1.639
+          ],
+          "gross_mean_usd": 0.65
+        }
+      },
+      "FADE": {
+        "train": {
+          "n": 79,
+          "mean_net_usd_per_oz": -1.96,
+          "win_rate": 45.6,
+          "ci95": [
+            -4.156,
+            0.178
+          ],
+          "gross_mean_usd": -0.46
+        },
+        "test": {
+          "n": 72,
+          "mean_net_usd_per_oz": -2.36,
+          "win_rate": 47.2,
+          "ci95": [
+            -7.002,
+            2.263
+          ],
+          "gross_mean_usd": -0.86
+        },
+        "all": {
+          "n": 151,
+          "mean_net_usd_per_oz": -2.15,
+          "win_rate": 46.4,
+          "ci95": [
+            -4.639,
+            0.214
+          ],
+          "gross_mean_usd": -0.65
+        }
+      }
+    }
+  },
+  "v2_blackout": {
+    "all": {
+      "trades": 80,
+      "expectancy_r": 0.534,
+      "expectancy_r_ci95": [
+        0.177,
+        0.891
+      ],
+      "win_rate": 46.2
+    },
+    "entry_within_30m_of_event": {
+      "trades": 1,
+      "expectancy_r": 2.495,
+      "expectancy_r_ci95": [
+        2.495,
+        2.495
+      ],
+      "win_rate": 100.0
+    },
+    "other": {
+      "trades": 79,
+      "expectancy_r": 0.509,
+      "expectancy_r_ci95": [
+        0.152,
+        0.883
+      ],
+      "win_rate": 45.6
+    },
+    "event_within_24h_after_entry": {
+      "trades": 12,
+      "expectancy_r": 0.152,
+      "expectancy_r_ci95": [
+        -0.727,
+        1.033
+      ],
+      "win_rate": 33.3
+    },
+    "no_event_within_24h": {
+      "trades": 68,
+      "expectancy_r": 0.601,
+      "expectancy_r_ci95": [
+        0.181,
+        1.015
+      ],
+      "win_rate": 48.5
+    }
+  }
+}

@@ -99,6 +99,9 @@ def _signal_cycle() -> None:
     import os
     from database import SessionLocal
     from services.signal_cycle import run_v2
+    from config import settings
+    if settings.SIGNAL_ENGINE.lower() == "legacy":
+        return  # rollback mode: no autonomous v2 decisions / paper entries
     db = SessionLocal()
     try:
         alerts = os.getenv("SIGNAL_CYCLE_ALERTS", "false").lower() in ("1", "true", "yes")

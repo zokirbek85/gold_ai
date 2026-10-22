@@ -1,0 +1,78 @@
+{
+ "windows": [
+  {
+   "test_start": "2022-01-01",
+   "n": 812,
+   "acc": 0.441,
+   "majority_baseline_acc": 0.453,
+   "balanced_acc": 0.342
+  },
+  {
+   "test_start": "2022-07-01",
+   "n": 788,
+   "acc": 0.447,
+   "majority_baseline_acc": 0.42,
+   "balanced_acc": 0.346
+  },
+  {
+   "test_start": "2023-01-01",
+   "n": 766,
+   "acc": 0.477,
+   "majority_baseline_acc": 0.44,
+   "balanced_acc": 0.362
+  },
+  {
+   "test_start": "2023-07-01",
+   "n": 774,
+   "acc": 0.416,
+   "majority_baseline_acc": 0.437,
+   "balanced_acc": 0.33
+  },
+  {
+   "test_start": "2024-01-01",
+   "n": 776,
+   "acc": 0.438,
+   "majority_baseline_acc": 0.515,
+   "balanced_acc": 0.333
+  },
+  {
+   "test_start": "2024-07-01",
+   "n": 797,
+   "acc": 0.418,
+   "majority_baseline_acc": 0.506,
+   "balanced_acc": 0.302
+  },
+  {
+   "test_start": "2025-01-01",
+   "n": 791,
+   "acc": 0.489,
+   "majority_baseline_acc": 0.534,
+   "balanced_acc": 0.349
+  },
+  {
+   "test_start": "2025-07-01",
+   "n": 824,
+   "acc": 0.431,
+   "majority_baseline_acc": 0.528,
+   "balanced_acc": 0.315
+  },
+  {
+   "test_start": "2026-01-01",
+   "n": 809,
+   "acc": 0.472,
+   "majority_baseline_acc": 0.465,
+   "balanced_acc": 0.34
+  }
+ ],
+ "pooled": {
+  "n": 7137,
+  "acc": 0.448,
+  "balanced_acc": 0.335,
+  "chance_balanced": 0.333,
+  "label_dist": {
+   "-1": 2877,
+   "0": 850,
+   "1": 3410
+  }
+ }
+}

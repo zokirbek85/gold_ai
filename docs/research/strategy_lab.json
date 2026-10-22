@@ -1,0 +1,2197 @@
+{
+  "strategy_version": "v2.0.0",
+  "generated_at": "2026-10-22T07:09:51.988355Z",
+  "risk_config": {
+    "spread": 0.3,
+    "slippage": 0.1,
+    "commission_per_lot": 0.0,
+    "swap_long": 0.0,
+    "swap_short": 0.0,
+    "max_spread": 0.6,
+    "max_spread_to_risk": 0.15,
+    "risk_pct": 0.5,
+    "contract_size": 100.0,
+    "lot_step": 0.01,
+    "min_lot": 0.01,
+    "max_lot": 5.0
+  },
+  "H4_D1": {
+    "period": {
+      "train": [
+        "2021-01-14 20:00:00",
+        "2024-06-30 21:00:00"
+      ],
+      "test": [
+        "2024-07-01 01:00:00",
+        "2026-10-22 00:00:00"
+      ]
+    },
+    "regimes": {
+      "HIGH_VOLATILITY": {
+        "bars": 143,
+        "share": 0.015,
+        "mean_fwd6_atr": -0.21,
+        "abs_fwd6_atr": 1.596,
+        "up_share": 0.524
+      },
+      "INSUFFICIENT_DATA": {
+        "bars": 99,
+        "share": 0.011,
+        "mean_fwd6_atr": -0.267,
+        "abs_fwd6_atr": 1.568,
+        "up_share": 0.525
+      },
+      "RANGE": {
+        "bars": 1981,
+        "share": 0.211,
+        "mean_fwd6_atr": 0.1,
+        "abs_fwd6_atr": 1.403,
+        "up_share": 0.522
+      },
+      "TRANSITION": {
+        "bars": 1686,
+        "share": 0.18,
+        "mean_fwd6_atr": 0.144,
+        "abs_fwd6_atr": 1.336,
+        "up_share": 0.539
+      },
+      "TREND_DOWN": {
+        "bars": 2347,
+        "share": 0.25,
+        "mean_fwd6_atr": 0.111,
+        "abs_fwd6_atr": 1.277,
+        "up_share": 0.556
+      },
+      "TREND_UP": {
+        "bars": 3105,
+        "share": 0.331,
+        "mean_fwd6_atr": 0.14,
+        "abs_fwd6_atr": 1.4,
+        "up_share": 0.522
+      }
+    },
+    "families": {
+      "trend_pullback": {
+        "train": {
+          "trades": 44,
+          "win_rate": 40.9,
+          "profit_factor": 1.59,
+          "expectancy_r": 0.36,
+          "expectancy_r_ci95": [
+            -0.12,
+            0.889
+          ],
+          "max_drawdown_r": 6.22,
+          "max_drawdown_pct": 3.07,
+          "max_consecutive_losses": 6,
+          "avg_win_r": 2.366,
+          "avg_loss_r": -1.029,
+          "avg_mfe_r": 1.561,
+          "avg_mae_r": 0.984,
+          "total_cost_r": 1.4
+        },
+        "test": {
+          "trades": 42,
+          "win_rate": 45.2,
+          "profit_factor": 1.92,
+          "expectancy_r": 0.492,
+          "expectancy_r_ci95": [
+            0.002,
+            0.992
+          ],
+          "max_drawdown_r": 6.09,
+          "max_drawdown_pct": 3.01,
+          "max_consecutive_losses": 6,
+          "avg_win_r": 2.276,
+          "avg_loss_r": -0.981,
+          "avg_mfe_r": 1.538,
+          "avg_mae_r": 1.026,
+          "total_cost_r": 0.67
+        },
+        "test_by_regime": {
+          "TREND_DOWN": {
+            "trades": 6,
+            "win_rate": 16.7,
+            "profit_factor": 0.57,
+            "expectancy_r": -0.307,
+            "max_drawdown_r": 4.0
+          },
+          "TREND_UP": {
+            "trades": 36,
+            "win_rate": 50.0,
+            "profit_factor": 2.24,
+            "expectancy_r": 0.625,
+            "max_drawdown_r": 6.09
+          }
+        },
+        "full_by_regime": {
+          "TREND_DOWN": {
+            "trades": 17,
+            "win_rate": 23.5,
+            "profit_factor": 0.79,
+            "expectancy_r": -0.156,
+            "max_drawdown_r": 5.19
+          },
+          "TREND_UP": {
+            "trades": 69,
+            "win_rate": 47.8,
+            "profit_factor": 2.07,
+            "expectancy_r": 0.568,
+            "max_drawdown_r": 6.22
+          }
+        },
+        "full_by_session": {
+          "asia": {
+            "trades": 42,
+            "win_rate": 42.9,
+            "profit_factor": 1.7,
+            "expectancy_r": 0.408,
+            "max_drawdown_r": 4.14
+          },
+          "london": {
+            "trades": 14,
+            "win_rate": 35.7,
+            "profit_factor": 1.12,
+            "expectancy_r": 0.081,
+            "max_drawdown_r": 3.76
+          },
+          "london_ny_overlap": {
+            "trades": 17,
+            "win_rate": 58.8,
+            "profit_factor": 3.7,
+            "expectancy_r": 1.025,
+            "max_drawdown_r": 2.05
+          },
+          "ny_late": {
+            "trades": 13,
+            "win_rate": 30.8,
+            "profit_factor": 1.09,
+            "expectancy_r": 0.062,
+            "max_drawdown_r": 4.12
+          }
+        },
+        "full_by_direction": {
+          "BUY": {
+            "trades": 69,
+            "win_rate": 47.8,
+            "profit_factor": 2.07,
+            "expectancy_r": 0.568,
+            "max_drawdown_r": 6.22
+          },
+          "SELL": {
+            "trades": 17,
+            "win_rate": 23.5,
+            "profit_factor": 0.79,
+            "expectancy_r": -0.156,
+            "max_drawdown_r": 5.19
+          }
+        },
+        "full_by_half_year": {
+          "2021H2": {
+            "trades": 6,
+            "win_rate": 0.0,
+            "profit_factor": 0.0,
+            "expectancy_r": -1.033,
+            "max_drawdown_r": 6.2
+          },
+          "2022H1": {
+            "trades": 4,
+            "win_rate": 50.0,
+            "profit_factor": 2.46,
+            "expectancy_r": 0.737,
+            "max_drawdown_r": 2.01
+          },
+          "2022H2": {
+            "trades": 7,
+            "win_rate": 42.9,
+            "profit_factor": 1.81,
+            "expectancy_r": 0.478,
+            "max_drawdown_r": 2.06
+          },
+          "2023H1": {
+            "trades": 7,
+            "win_rate": 71.4,
+            "profit_factor": 5.02,
+            "expectancy_r": 1.177,
+            "max_drawdown_r": 1.03
+          },
+          "2023H2": {
+            "trades": 8,
+            "win_rate": 37.5,
+            "profit_factor": 1.44,
+            "expectancy_r": 0.286,
+            "max_drawdown_r": 4.11
+          },
+          "2024H1": {
+            "trades": 12,
+            "win_rate": 41.7,
+            "profit_factor": 1.72,
+            "expectancy_r": 0.435,
+            "max_drawdown_r": 5.18
+          },
+          "2024H2": {
+            "trades": 14,
+            "win_rate": 35.7,
+            "profit_factor": 1.1,
+            "expectancy_r": 0.063,
+            "max_drawdown_r": 6.09
+          },
+          "2025H1": {
+            "trades": 12,
+            "win_rate": 50.0,
+            "profit_factor": 2.29,
+            "expectancy_r": 0.651,
+            "max_drawdown_r": 3.01
+          },
+          "2025H2": {
+            "trades": 8,
+            "win_rate": 62.5,
+            "profit_factor": 4.11,
+            "expectancy_r": 1.179,
+            "max_drawdown_r": 2.03
+          },
+          "2026H1": {
+            "trades": 3,
+            "win_rate": 66.7,
+            "profit_factor": 4.44,
+            "expectancy_r": 1.131,
+            "max_drawdown_r": 0.99
+          },
+          "2026H2": {
+            "trades": 5,
+            "win_rate": 20.0,
+            "profit_factor": 0.74,
+            "expectancy_r": -0.171,
+            "max_drawdown_r": 3.01
+          }
+        },
+        "trades_per_month": 1.24
+      },
+      "donchian_break": {
+        "train": {
+          "trades": 172,
+          "win_rate": 33.7,
+          "profit_factor": 0.87,
+          "expectancy_r": -0.093,
+          "expectancy_r_ci95": [
+            -0.295,
+            0.122
+          ],
+          "max_drawdown_r": 39.73,
+          "max_drawdown_pct": 18.24,
+          "max_consecutive_losses": 9,
+          "avg_win_r": 1.789,
+          "avg_loss_r": -1.051,
+          "avg_mfe_r": 1.189,
+          "avg_mae_r": 1.024,
+          "total_cost_r": 4.53
+        },
+        "test": {
+          "trades": 121,
+          "win_rate": 46.3,
+          "profit_factor": 1.57,
+          "expectancy_r": 0.306,
+          "expectancy_r_ci95": [
+            0.052,
+            0.563
+          ],
+          "max_drawdown_r": 6.57,
+          "max_drawdown_pct": 3.3,
+          "max_consecutive_losses": 5,
+          "avg_win_r": 1.828,
+          "avg_loss_r": -1.005,
+          "avg_mfe_r": 1.342,
+          "avg_mae_r": 0.845,
+          "total_cost_r": 1.37
+        },
+        "test_by_regime": {
+          "RANGE": {
+            "trades": 24,
+            "win_rate": 58.3,
+            "profit_factor": 2.66,
+            "expectancy_r": 0.701,
+            "max_drawdown_r": 3.12
+          },
+          "TRANSITION": {
+            "trades": 25,
+            "win_rate": 48.0,
+            "profit_factor": 1.46,
+            "expectancy_r": 0.24,
+            "max_drawdown_r": 5.08
+          },
+          "TREND_DOWN": {
+            "trades": 28,
+            "win_rate": 32.1,
+            "profit_factor": 0.83,
+            "expectancy_r": -0.113,
+            "max_drawdown_r": 8.07
+          },
+          "TREND_UP": {
+            "trades": 44,
+            "win_rate": 47.7,
+            "profit_factor": 1.76,
+            "expectancy_r": 0.397,
+            "max_drawdown_r": 4.06
+          }
+        },
+        "full_by_regime": {
+          "RANGE": {
+            "trades": 71,
+            "win_rate": 39.4,
+            "profit_factor": 1.25,
+            "expectancy_r": 0.156,
+            "max_drawdown_r": 9.42
+          },
+          "TRANSITION": {
+            "trades": 60,
+            "win_rate": 31.7,
+            "profit_factor": 0.73,
+            "expectancy_r": -0.189,
+            "max_drawdown_r": 18.57
+          },
+          "TREND_DOWN": {
+            "trades": 71,
+            "win_rate": 31.0,
+            "profit_factor": 0.67,
+            "expectancy_r": -0.244,
+            "max_drawdown_r": 21.16
+          },
+          "TREND_UP": {
+            "trades": 91,
+            "win_rate": 49.5,
+            "profit_factor": 1.83,
+            "expectancy_r": 0.425,
+            "max_drawdown_r": 5.09
+          }
+        },
+        "full_by_session": {
+          "asia": {
+            "trades": 86,
+            "win_rate": 38.4,
+            "profit_factor": 1.19,
+            "expectancy_r": 0.115,
+            "max_drawdown_r": 12.49
+          },
+          "london": {
+            "trades": 69,
+            "win_rate": 36.2,
+            "profit_factor": 1.03,
+            "expectancy_r": 0.018,
+            "max_drawdown_r": 12.7
+          },
+          "london_ny_overlap": {
+            "trades": 87,
+            "win_rate": 39.1,
+            "profit_factor": 1.06,
+            "expectancy_r": 0.039,
+            "max_drawdown_r": 13.87
+          },
+          "ny_late": {
+            "trades": 51,
+            "win_rate": 43.1,
+            "profit_factor": 1.19,
+            "expectancy_r": 0.127,
+            "max_drawdown_r": 19.99
+          }
+        },
+        "full_by_direction": {
+          "BUY": {
+            "trades": 192,
+            "win_rate": 44.8,
+            "profit_factor": 1.43,
+            "expectancy_r": 0.243,
+            "max_drawdown_r": 15.11
+          },
+          "SELL": {
+            "trades": 101,
+            "win_rate": 27.7,
+            "profit_factor": 0.67,
+            "expectancy_r": -0.253,
+            "max_drawdown_r": 31.02
+          }
+        },
+        "full_by_half_year": {
+          "2021H1": {
+            "trades": 21,
+            "win_rate": 47.6,
+            "profit_factor": 1.49,
+            "expectancy_r": 0.247,
+            "max_drawdown_r": 3.87
+          },
+          "2021H2": {
+            "trades": 24,
+            "win_rate": 20.8,
+            "profit_factor": 0.52,
+            "expectancy_r": -0.378,
+            "max_drawdown_r": 11.94
+          },
+          "2022H1": {
+            "trades": 32,
+            "win_rate": 28.1,
+            "profit_factor": 0.57,
+            "expectancy_r": -0.379,
+            "max_drawdown_r": 17.55
+          },
+          "2022H2": {
+            "trades": 25,
+            "win_rate": 28.0,
+            "profit_factor": 0.75,
+            "expectancy_r": -0.182,
+            "max_drawdown_r": 8.51
+          },
+          "2023H1": {
+            "trades": 25,
+            "win_rate": 28.0,
+            "profit_factor": 0.6,
+            "expectancy_r": -0.291,
+            "max_drawdown_r": 11.25
+          },
+          "2023H2": {
+            "trades": 23,
+            "win_rate": 43.5,
+            "profit_factor": 1.38,
+            "expectancy_r": 0.222,
+            "max_drawdown_r": 5.14
+          },
+          "2024H1": {
+            "trades": 22,
+            "win_rate": 45.5,
+            "profit_factor": 1.55,
+            "expectancy_r": 0.303,
+            "max_drawdown_r": 5.12
+          },
+          "2024H2": {
+            "trades": 26,
+            "win_rate": 42.3,
+            "profit_factor": 1.33,
+            "expectancy_r": 0.192,
+            "max_drawdown_r": 5.11
+          },
+          "2025H1": {
+            "trades": 25,
+            "win_rate": 48.0,
+            "profit_factor": 1.72,
+            "expectancy_r": 0.373,
+            "max_drawdown_r": 4.07
+          },
+          "2025H2": {
+            "trades": 23,
+            "win_rate": 60.9,
+            "profit_factor": 2.58,
+            "expectancy_r": 0.625,
+            "max_drawdown_r": 4.04
+          },
+          "2026H1": {
+            "trades": 31,
+            "win_rate": 48.4,
+            "profit_factor": 1.78,
+            "expectancy_r": 0.402,
+            "max_drawdown_r": 6.5
+          },
+          "2026H2": {
+            "trades": 16,
+            "win_rate": 25.0,
+            "profit_factor": 0.66,
+            "expectancy_r": -0.255,
+            "max_drawdown_r": 5.07
+          }
+        },
+        "trades_per_month": 4.23
+      },
+      "ts_momentum": {
+        "train": {
+          "trades": 46,
+          "win_rate": 28.3,
+          "profit_factor": 0.95,
+          "expectancy_r": -0.032,
+          "expectancy_r_ci95": [
+            -0.485,
+            0.438
+          ],
+          "max_drawdown_r": 9.19,
+          "max_drawdown_pct": 4.54,
+          "max_consecutive_losses": 9,
+          "avg_win_r": 2.405,
+          "avg_loss_r": -0.992,
+          "avg_mfe_r": 1.315,
+          "avg_mae_r": 1.095,
+          "total_cost_r": 1.31
+        },
+        "test": {
+          "trades": 36,
+          "win_rate": 27.8,
+          "profit_factor": 0.65,
+          "expectancy_r": -0.255,
+          "expectancy_r_ci95": [
+            -0.654,
+            0.213
+          ],
+          "max_drawdown_r": 16.82,
+          "max_drawdown_pct": 8.11,
+          "max_consecutive_losses": 10,
+          "avg_win_r": 1.693,
+          "avg_loss_r": -1.004,
+          "avg_mfe_r": 1.068,
+          "avg_mae_r": 1.007,
+          "total_cost_r": 0.39
+        },
+        "test_by_regime": {
+          "TRANSITION": {
+            "trades": 6,
+            "win_rate": 33.3,
+            "profit_factor": 1.22,
+            "expectancy_r": 0.148,
+            "max_drawdown_r": 3.03
+          },
+          "TREND_DOWN": {
+            "trades": 14,
+            "win_rate": 28.6,
+            "profit_factor": 0.49,
+            "expectancy_r": -0.369,
+            "max_drawdown_r": 7.89
+          },
+          "TREND_UP": {
+            "trades": 16,
+            "win_rate": 25.0,
+            "profit_factor": 0.59,
+            "expectancy_r": -0.306,
+            "max_drawdown_r": 8.9
+          }
+        },
+        "full_by_regime": {
+          "TRANSITION": {
+            "trades": 21,
+            "win_rate": 33.3,
+            "profit_factor": 1.28,
+            "expectancy_r": 0.184,
+            "max_drawdown_r": 4.95
+          },
+          "TREND_DOWN": {
+            "trades": 27,
+            "win_rate": 29.6,
+            "profit_factor": 0.59,
+            "expectancy_r": -0.293,
+            "max_drawdown_r": 13.03
+          },
+          "TREND_UP": {
+            "trades": 34,
+            "win_rate": 23.5,
+            "profit_factor": 0.74,
+            "expectancy_r": -0.194,
+            "max_drawdown_r": 10.11
+          }
+        },
+        "full_by_session": {
+          "asia": {
+            "trades": 19,
+            "win_rate": 36.8,
+            "profit_factor": 1.45,
+            "expectancy_r": 0.289,
+            "max_drawdown_r": 4.21
+          },
+          "london": {
+            "trades": 18,
+            "win_rate": 11.1,
+            "profit_factor": 0.38,
+            "expectancy_r": -0.538,
+            "max_drawdown_r": 12.23
+          },
+          "london_ny_overlap": {
+            "trades": 23,
+            "win_rate": 39.1,
+            "profit_factor": 1.01,
+            "expectancy_r": 0.006,
+            "max_drawdown_r": 5.13
+          },
+          "ny_late": {
+            "trades": 22,
+            "win_rate": 22.7,
+            "profit_factor": 0.61,
+            "expectancy_r": -0.3,
+            "max_drawdown_r": 12.06
+          }
+        },
+        "full_by_direction": {
+          "BUY": {
+            "trades": 42,
+            "win_rate": 26.2,
+            "profit_factor": 0.83,
+            "expectancy_r": -0.127,
+            "max_drawdown_r": 10.92
+          },
+          "SELL": {
+            "trades": 40,
+            "win_rate": 30.0,
+            "profit_factor": 0.81,
+            "expectancy_r": -0.133,
+            "max_drawdown_r": 13.48
+          }
+        },
+        "full_by_half_year": {
+          "2021H1": {
+            "trades": 4,
+            "win_rate": 50.0,
+            "profit_factor": 4.11,
+            "expectancy_r": 1.127,
+            "max_drawdown_r": 1.02
+          },
+          "2021H2": {
+            "trades": 9,
+            "win_rate": 22.2,
+            "profit_factor": 0.83,
+            "expectancy_r": -0.132,
+            "max_drawdown_r": 3.06
+          },
+          "2022H1": {
+            "trades": 7,
+            "win_rate": 42.9,
+            "profit_factor": 1.48,
+            "expectancy_r": 0.277,
+            "max_drawdown_r": 2.01
+          },
+          "2022H2": {
+            "trades": 5,
+            "win_rate": 60.0,
+            "profit_factor": 2.25,
+            "expectancy_r": 0.487,
+            "max_drawdown_r": 1.02
+          },
+          "2023H1": {
+            "trades": 4,
+            "win_rate": 0.0,
+            "profit_factor": 0.0,
+            "expectancy_r": -1.011,
+            "max_drawdown_r": 4.04
+          },
+          "2023H2": {
+            "trades": 11,
+            "win_rate": 27.3,
+            "profit_factor": 1.12,
+            "expectancy_r": 0.089,
+            "max_drawdown_r": 5.12
+          },
+          "2024H1": {
+            "trades": 6,
+            "win_rate": 0.0,
+            "profit_factor": 0.0,
+            "expectancy_r": -1.02,
+            "max_drawdown_r": 6.12
+          },
+          "2024H2": {
+            "trades": 7,
+            "win_rate": 57.1,
+            "profit_factor": 2.28,
+            "expectancy_r": 0.554,
+            "max_drawdown_r": 2.02
+          },
+          "2025H1": {
+            "trades": 4,
+            "win_rate": 0.0,
+            "profit_factor": 0.0,
+            "expectancy_r": -1.012,
+            "max_drawdown_r": 4.05
+          },
+          "2025H2": {
+            "trades": 8,
+            "win_rate": 12.5,
+            "profit_factor": 0.1,
+            "expectancy_r": -0.776,
+            "max_drawdown_r": 6.21
+          },
+          "2026H1": {
+            "trades": 12,
+            "win_rate": 33.3,
+            "profit_factor": 0.82,
+            "expectancy_r": -0.121,
+            "max_drawdown_r": 7.22
+          },
+          "2026H2": {
+            "trades": 5,
+            "win_rate": 20.0,
+            "profit_factor": 0.67,
+            "expectancy_r": -0.267,
+            "max_drawdown_r": 4.06
+          }
+        },
+        "trades_per_month": 1.18
+      },
+      "mean_reversion": {
+        "train": {
+          "trades": 2,
+          "win_rate": 50.0,
+          "profit_factor": 1.44,
+          "expectancy_r": 0.226,
+          "expectancy_r_ci95": [
+            -1.028,
+            1.48
+          ],
+          "max_drawdown_r": 1.03,
+          "max_drawdown_pct": 0.51,
+          "max_consecutive_losses": 1,
+          "avg_win_r": 1.48,
+          "avg_loss_r": -1.028,
+          "avg_mfe_r": 1.017,
+          "avg_mae_r": 1.65,
+          "total_cost_r": 0.07
+        },
+        "test": {
+          "trades": 0,
+          "win_rate": null,
+          "profit_factor": null,
+          "expectancy_r": null,
+          "expectancy_r_ci95": null,
+          "max_drawdown_r": null,
+          "max_drawdown_pct": null,
+          "max_consecutive_losses": null,
+          "avg_win_r": null,
+          "avg_loss_r": null,
+          "avg_mfe_r": null,
+          "avg_mae_r": null,
+          "total_cost_r": null
+        },
+        "test_by_regime": {},
+        "full_by_regime": {
+          "RANGE": {
+            "trades": 2,
+            "win_rate": 50.0,
+            "profit_factor": 1.44,
+            "expectancy_r": 0.226,
+            "max_drawdown_r": 1.03
+          }
+        },
+        "full_by_session": {
+          "ny_late": {
+            "trades": 2,
+            "win_rate": 50.0,
+            "profit_factor": 1.44,
+            "expectancy_r": 0.226,
+            "max_drawdown_r": 1.03
+          }
+        },
+        "full_by_direction": {
+          "BUY": {
+            "trades": 2,
+            "win_rate": 50.0,
+            "profit_factor": 1.44,
+            "expectancy_r": 0.226,
+            "max_drawdown_r": 1.03
+          }
+        },
+        "full_by_half_year": {
+          "2022H2": {
+            "trades": 1,
+            "win_rate": 0.0,
+            "profit_factor": 0.0,
+            "expectancy_r": -1.028,
+            "max_drawdown_r": 1.03
+          },
+          "2023H1": {
+            "trades": 1,
+            "win_rate": 100.0,
+            "profit_factor": null,
+            "expectancy_r": 1.48,
+            "max_drawdown_r": 0.0
+          }
+        },
+        "trades_per_month": 0.03
+      },
+      "squeeze_break": {
+        "train": {
+          "trades": 78,
+          "win_rate": 26.9,
+          "profit_factor": 0.72,
+          "expectancy_r": -0.234,
+          "expectancy_r_ci95": [
+            -0.61,
+            0.13
+          ],
+          "max_drawdown_r": 29.69,
+          "max_drawdown_pct": 13.96,
+          "max_consecutive_losses": 9,
+          "avg_win_r": 2.222,
+          "avg_loss_r": -1.139,
+          "avg_mfe_r": 1.355,
+          "avg_mae_r": 1.166,
+          "total_cost_r": 2.89
+        },
+        "test": {
+          "trades": 61,
+          "win_rate": 44.3,
+          "profit_factor": 1.83,
+          "expectancy_r": 0.461,
+          "expectancy_r_ci95": [
+            0.03,
+            0.863
+          ],
+          "max_drawdown_r": 11.26,
+          "max_drawdown_pct": 5.5,
+          "max_consecutive_losses": 7,
+          "avg_win_r": 2.294,
+          "avg_loss_r": -0.995,
+          "avg_mfe_r": 1.728,
+          "avg_mae_r": 0.934,
+          "total_cost_r": 0.95
+        },
+        "test_by_regime": {
+          "RANGE": {
+            "trades": 23,
+            "win_rate": 39.1,
+            "profit_factor": 1.5,
+            "expectancy_r": 0.31,
+            "max_drawdown_r": 6.62
+          },
+          "TRANSITION": {
+            "trades": 17,
+            "win_rate": 58.8,
+            "profit_factor": 2.9,
+            "expectancy_r": 0.799,
+            "max_drawdown_r": 4.67
+          },
+          "TREND_DOWN": {
+            "trades": 11,
+            "win_rate": 27.3,
+            "profit_factor": 1.0,
+            "expectancy_r": -0.0,
+            "max_drawdown_r": 4.44
+          },
+          "TREND_UP": {
+            "trades": 10,
+            "win_rate": 50.0,
+            "profit_factor": 2.46,
+            "expectancy_r": 0.739,
+            "max_drawdown_r": 3.05
+          }
+        },
+        "full_by_regime": {
+          "RANGE": {
+            "trades": 53,
+            "win_rate": 30.2,
+            "profit_factor": 0.99,
+            "expectancy_r": -0.007,
+            "max_drawdown_r": 16.13
+          },
+          "TRANSITION": {
+            "trades": 39,
+            "win_rate": 35.9,
+            "profit_factor": 1.19,
+            "expectancy_r": 0.127,
+            "max_drawdown_r": 13.58
+          },
+          "TREND_DOWN": {
+            "trades": 21,
+            "win_rate": 33.3,
+            "profit_factor": 0.77,
+            "expectancy_r": -0.218,
+            "max_drawdown_r": 10.0
+          },
+          "TREND_UP": {
+            "trades": 26,
+            "win_rate": 42.3,
+            "profit_factor": 1.65,
+            "expectancy_r": 0.377,
+            "max_drawdown_r": 4.12
+          }
+        },
+        "full_by_session": {
+          "asia": {
+            "trades": 33,
+            "win_rate": 36.4,
+            "profit_factor": 1.39,
+            "expectancy_r": 0.253,
+            "max_drawdown_r": 8.23
+          },
+          "london": {
+            "trades": 36,
+            "win_rate": 22.2,
+            "profit_factor": 0.51,
+            "expectancy_r": -0.392,
+            "max_drawdown_r": 16.34
+          },
+          "london_ny_overlap": {
+            "trades": 42,
+            "win_rate": 40.5,
+            "profit_factor": 1.54,
+            "expectancy_r": 0.319,
+            "max_drawdown_r": 5.16
+          },
+          "ny_late": {
+            "trades": 28,
+            "win_rate": 39.3,
+            "profit_factor": 1.09,
+            "expectancy_r": 0.078,
+            "max_drawdown_r": 13.36
+          }
+        },
+        "full_by_direction": {
+          "BUY": {
+            "trades": 78,
+            "win_rate": 38.5,
+            "profit_factor": 1.36,
+            "expectancy_r": 0.227,
+            "max_drawdown_r": 19.17
+          },
+          "SELL": {
+            "trades": 61,
+            "win_rate": 29.5,
+            "profit_factor": 0.84,
+            "expectancy_r": -0.13,
+            "max_drawdown_r": 25.6
+          }
+        },
+        "full_by_half_year": {
+          "2021H1": {
+            "trades": 9,
+            "win_rate": 33.3,
+            "profit_factor": 1.21,
+            "expectancy_r": 0.142,
+            "max_drawdown_r": 3.1
+          },
+          "2021H2": {
+            "trades": 9,
+            "win_rate": 11.1,
+            "profit_factor": 0.3,
+            "expectancy_r": -0.643,
+            "max_drawdown_r": 5.78
+          },
+          "2022H1": {
+            "trades": 14,
+            "win_rate": 14.3,
+            "profit_factor": 0.05,
+            "expectancy_r": -1.279,
+            "max_drawdown_r": 17.9
+          },
+          "2022H2": {
+            "trades": 11,
+            "win_rate": 27.3,
+            "profit_factor": 0.94,
+            "expectancy_r": -0.045,
+            "max_drawdown_r": 3.82
+          },
+          "2023H1": {
+            "trades": 12,
+            "win_rate": 33.3,
+            "profit_factor": 1.22,
+            "expectancy_r": 0.149,
+            "max_drawdown_r": 4.07
+          },
+          "2023H2": {
+            "trades": 13,
+            "win_rate": 38.5,
+            "profit_factor": 1.44,
+            "expectancy_r": 0.282,
+            "max_drawdown_r": 4.2
+          },
+          "2024H1": {
+            "trades": 10,
+            "win_rate": 30.0,
+            "profit_factor": 0.88,
+            "expectancy_r": -0.084,
+            "max_drawdown_r": 6.2
+          },
+          "2024H2": {
+            "trades": 14,
+            "win_rate": 42.9,
+            "profit_factor": 1.57,
+            "expectancy_r": 0.334,
+            "max_drawdown_r": 3.04
+          },
+          "2025H1": {
+            "trades": 13,
+            "win_rate": 30.8,
+            "profit_factor": 0.87,
+            "expectancy_r": -0.094,
+            "max_drawdown_r": 6.65
+          },
+          "2025H2": {
+            "trades": 13,
+            "win_rate": 53.8,
+            "profit_factor": 3.01,
+            "expectancy_r": 0.838,
+            "max_drawdown_r": 5.07
+          },
+          "2026H1": {
+            "trades": 11,
+            "win_rate": 63.6,
+            "profit_factor": 4.34,
+            "expectancy_r": 1.216,
+            "max_drawdown_r": 2.01
+          },
+          "2026H2": {
+            "trades": 10,
+            "win_rate": 30.0,
+            "profit_factor": 1.05,
+            "expectancy_r": 0.038,
+            "max_drawdown_r": 3.05
+          }
+        },
+        "trades_per_month": 2.01
+      }
+    },
+    "router": {
+      "table": {
+        "TREND_UP": {
+          "family": "trend_pullback",
+          "train_exp": 0.505,
+          "n": 33
+        },
+        "TRANSITION": {
+          "family": "ts_momentum",
+          "train_exp": 0.198,
+          "n": 15
+        }
+      },
+      "test": {
+        "trades": 42,
+        "win_rate": 50.0,
+        "profit_factor": 2.21,
+        "expectancy_r": 0.612,
+        "expectancy_r_ci95": [
+          0.099,
+          1.168
+        ],
+        "max_drawdown_r": 6.09,
+        "max_drawdown_pct": 3.01,
+        "max_consecutive_losses": 6,
+        "avg_win_r": 2.239,
+        "avg_loss_r": -1.015,
+        "avg_mfe_r": 1.602,
+        "avg_mae_r": 0.96,
+        "total_cost_r": 0.66
+      }
+    },
+    "router_walk_forward": {
+      "windows": [
+        {
+          "fit": [
+            "2021-02-01",
+            "2023-02-01"
+          ],
+          "table": {
+            "TREND_UP": "donchian_break"
+          },
+          "oos_trades": 9,
+          "oos_expectancy_r": 0.06
+        },
+        {
+          "fit": [
+            "2021-08-01",
+            "2023-08-01"
+          ],
+          "table": {
+            "TREND_UP": "trend_pullback"
+          },
+          "oos_trades": 9,
+          "oos_expectancy_r": 0.134
+        },
+        {
+          "fit": [
+            "2022-02-01",
+            "2024-02-01"
+          ],
+          "table": {
+            "TREND_UP": "trend_pullback",
+            "RANGE": "donchian_break"
+          },
+          "oos_trades": 18,
+          "oos_expectancy_r": 0.57
+        },
+        {
+          "fit": [
+            "2022-08-01",
+            "2024-08-01"
+          ],
+          "table": {
+            "TREND_UP": "trend_pullback",
+            "RANGE": "squeeze_break"
+          },
+          "oos_trades": 17,
+          "oos_expectancy_r": -0.128
+        },
+        {
+          "fit": [
+            "2023-02-01",
+            "2025-02-01"
+          ],
+          "table": {
+            "TREND_UP": "squeeze_break",
+            "TREND_DOWN": "donchian_break",
+            "RANGE": "squeeze_break",
+            "TRANSITION": "squeeze_break"
+          },
+          "oos_trades": 16,
+          "oos_expectancy_r": -0.515
+        },
+        {
+          "fit": [
+            "2023-08-01",
+            "2025-08-01"
+          ],
+          "table": {
+            "TREND_UP": "squeeze_break",
+            "RANGE": "donchian_break",
+            "TREND_DOWN": "donchian_break",
+            "TRANSITION": "squeeze_break"
+          },
+          "oos_trades": 14,
+          "oos_expectancy_r": 1.532
+        },
+        {
+          "fit": [
+            "2024-02-01",
+            "2026-02-01"
+          ],
+          "table": {
+            "TREND_UP": "trend_pullback",
+            "TRANSITION": "squeeze_break",
+            "TREND_DOWN": "donchian_break",
+            "RANGE": "donchian_break"
+          },
+          "oos_trades": 23,
+          "oos_expectancy_r": 0.058
+        },
+        {
+          "fit": [
+            "2024-08-01",
+            "2026-08-01"
+          ],
+          "table": {
+            "TREND_UP": "trend_pullback",
+            "TRANSITION": "squeeze_break",
+            "TREND_DOWN": "donchian_break",
+            "RANGE": "donchian_break"
+          },
+          "oos_trades": 8,
+          "oos_expectancy_r": -0.196
+        }
+      ],
+      "pooled_trades": 114,
+      "pooled_expectancy_r": 0.2
+    },
+    "swap_sensitivity_test": {
+      "swap_0.0": {
+        "trend_pullback": 0.492,
+        "donchian_break": 0.306,
+        "ts_momentum": -0.255,
+        "mean_reversion": null,
+        "squeeze_break": 0.461
+      },
+      "swap_-0.25": {
+        "trend_pullback": 0.468,
+        "donchian_break": 0.284,
+        "ts_momentum": -0.281,
+        "mean_reversion": null,
+        "squeeze_break": 0.435
+      },
+      "swap_-0.5": {
+        "trend_pullback": 0.443,
+        "donchian_break": 0.262,
+        "ts_momentum": -0.308,
+        "mean_reversion": null,
+        "squeeze_break": 0.409
+      }
+    }
+  },
+  "H1_H4": {
+    "period": {
+      "train": [
+        "2024-01-02 02:00:00",
+        "2025-03-31 23:00:00"
+      ],
+      "test": [
+        "2025-04-01 00:00:00",
+        "2026-10-22 06:00:00"
+      ]
+    },
+    "regimes": {
+      "HIGH_VOLATILITY": {
+        "bars": 171,
+        "share": 0.01,
+        "mean_fwd6_atr": -0.222,
+        "abs_fwd6_atr": 1.136,
+        "up_share": 0.503
+      },
+      "INSUFFICIENT_DATA": {
+        "bars": 99,
+        "share": 0.006,
+        "mean_fwd6_atr": -0.004,
+        "abs_fwd6_atr": 1.137,
+        "up_share": 0.505
+      },
+      "LOW_VOLATILITY": {
+        "bars": 98,
+        "share": 0.006,
+        "mean_fwd6_atr": 1.911,
+        "abs_fwd6_atr": 3.299,
+        "up_share": 0.724
+      },
+      "RANGE": {
+        "bars": 3941,
+        "share": 0.226,
+        "mean_fwd6_atr": 0.066,
+        "abs_fwd6_atr": 1.464,
+        "up_share": 0.508
+      },
+      "TRANSITION": {
+        "bars": 2692,
+        "share": 0.154,
+        "mean_fwd6_atr": -0.04,
+        "abs_fwd6_atr": 1.346,
+        "up_share": 0.503
+      },
+      "TREND_DOWN": {
+        "bars": 4436,
+        "share": 0.254,
+        "mean_fwd6_atr": 0.158,
+        "abs_fwd6_atr": 1.219,
+        "up_share": 0.565
+      },
+      "TREND_UP": {
+        "bars": 5988,
+        "share": 0.343,
+        "mean_fwd6_atr": 0.189,
+        "abs_fwd6_atr": 1.371,
+        "up_share": 0.549
+      }
+    },
+    "families": {
+      "trend_pullback": {
+        "train": {
+          "trades": 91,
+          "win_rate": 33.0,
+          "profit_factor": 1.07,
+          "expectancy_r": 0.049,
+          "expectancy_r_ci95": [
+            -0.264,
+            0.373
+          ],
+          "max_drawdown_r": 10.96,
+          "max_drawdown_pct": 5.35,
+          "max_consecutive_losses": 9,
+          "avg_win_r": 2.244,
+          "avg_loss_r": -1.031,
+          "avg_mfe_r": 1.323,
+          "avg_mae_r": 1.064,
+          "total_cost_r": 4.58
+        },
+        "test": {
+          "trades": 111,
+          "win_rate": 33.3,
+          "profit_factor": 1.1,
+          "expectancy_r": 0.066,
+          "expectancy_r_ci95": [
+            -0.22,
+            0.356
+          ],
+          "max_drawdown_r": 14.06,
+          "max_drawdown_pct": 6.89,
+          "max_consecutive_losses": 9,
+          "avg_win_r": 2.199,
+          "avg_loss_r": -1.0,
+          "avg_mfe_r": 1.429,
+          "avg_mae_r": 1.14,
+          "total_cost_r": 2.46
+        },
+        "test_by_regime": {
+          "TREND_DOWN": {
+            "trades": 43,
+            "win_rate": 25.6,
+            "profit_factor": 0.69,
+            "expectancy_r": -0.225,
+            "max_drawdown_r": 10.72
+          },
+          "TREND_UP": {
+            "trades": 68,
+            "win_rate": 38.2,
+            "profit_factor": 1.4,
+            "expectancy_r": 0.251,
+            "max_drawdown_r": 12.05
+          }
+        },
+        "full_by_regime": {
+          "TREND_DOWN": {
+            "trades": 54,
+            "win_rate": 24.1,
+            "profit_factor": 0.65,
+            "expectancy_r": -0.263,
+            "max_drawdown_r": 15.25
+          },
+          "TREND_UP": {
+            "trades": 148,
+            "win_rate": 36.5,
+            "profit_factor": 1.27,
+            "expectancy_r": 0.176,
+            "max_drawdown_r": 12.05
+          }
+        },
+        "full_by_session": {
+          "asia": {
+            "trades": 77,
+            "win_rate": 26.0,
+            "profit_factor": 0.77,
+            "expectancy_r": -0.172,
+            "max_drawdown_r": 19.77
+          },
+          "london": {
+            "trades": 50,
+            "win_rate": 40.0,
+            "profit_factor": 1.59,
+            "expectancy_r": 0.354,
+            "max_drawdown_r": 6.23
+          },
+          "london_ny_overlap": {
+            "trades": 33,
+            "win_rate": 24.2,
+            "profit_factor": 0.62,
+            "expectancy_r": -0.28,
+            "max_drawdown_r": 14.19
+          },
+          "ny_late": {
+            "trades": 42,
+            "win_rate": 45.2,
+            "profit_factor": 1.69,
+            "expectancy_r": 0.394,
+            "max_drawdown_r": 6.12
+          }
+        },
+        "full_by_direction": {
+          "BUY": {
+            "trades": 148,
+            "win_rate": 36.5,
+            "profit_factor": 1.27,
+            "expectancy_r": 0.176,
+            "max_drawdown_r": 12.05
+          },
+          "SELL": {
+            "trades": 54,
+            "win_rate": 24.1,
+            "profit_factor": 0.65,
+            "expectancy_r": -0.263,
+            "max_drawdown_r": 15.25
+          }
+        },
+        "full_by_half_year": {
+          "2024H1": {
+            "trades": 31,
+            "win_rate": 25.8,
+            "profit_factor": 0.77,
+            "expectancy_r": -0.18,
+            "max_drawdown_r": 9.91
+          },
+          "2024H2": {
+            "trades": 37,
+            "win_rate": 37.8,
+            "profit_factor": 1.28,
+            "expectancy_r": 0.177,
+            "max_drawdown_r": 6.45
+          },
+          "2025H1": {
+            "trades": 31,
+            "win_rate": 41.9,
+            "profit_factor": 1.63,
+            "expectancy_r": 0.372,
+            "max_drawdown_r": 6.62
+          },
+          "2025H2": {
+            "trades": 39,
+            "win_rate": 23.1,
+            "profit_factor": 0.7,
+            "expectancy_r": -0.231,
+            "max_drawdown_r": 9.96
+          },
+          "2026H1": {
+            "trades": 41,
+            "win_rate": 41.5,
+            "profit_factor": 1.49,
+            "expectancy_r": 0.291,
+            "max_drawdown_r": 8.0
+          },
+          "2026H2": {
+            "trades": 23,
+            "win_rate": 26.1,
+            "profit_factor": 0.79,
+            "expectancy_r": -0.158,
+            "max_drawdown_r": 8.65
+          }
+        },
+        "trades_per_month": 6.0
+      },
+      "donchian_break": {
+        "train": {
+          "trades": 242,
+          "win_rate": 37.6,
+          "profit_factor": 1.08,
+          "expectancy_r": 0.053,
+          "expectancy_r_ci95": [
+            -0.117,
+            0.23
+          ],
+          "max_drawdown_r": 17.78,
+          "max_drawdown_pct": 8.68,
+          "max_consecutive_losses": 8,
+          "avg_win_r": 1.834,
+          "avg_loss_r": -1.02,
+          "avg_mfe_r": 1.195,
+          "avg_mae_r": 0.97,
+          "total_cost_r": 9.45
+        },
+        "test": {
+          "trades": 333,
+          "win_rate": 39.0,
+          "profit_factor": 1.14,
+          "expectancy_r": 0.087,
+          "expectancy_r_ci95": [
+            -0.055,
+            0.238
+          ],
+          "max_drawdown_r": 17.91,
+          "max_drawdown_pct": 8.65,
+          "max_consecutive_losses": 9,
+          "avg_win_r": 1.767,
+          "avg_loss_r": -0.989,
+          "avg_mfe_r": 1.24,
+          "avg_mae_r": 0.944,
+          "total_cost_r": 5.8
+        },
+        "test_by_regime": {
+          "LOW_VOLATILITY": {
+            "trades": 9,
+            "win_rate": 55.6,
+            "profit_factor": 2.35,
+            "expectancy_r": 0.631,
+            "max_drawdown_r": 1.08
+          },
+          "RANGE": {
+            "trades": 78,
+            "win_rate": 39.7,
+            "profit_factor": 1.25,
+            "expectancy_r": 0.148,
+            "max_drawdown_r": 6.45
+          },
+          "TRANSITION": {
+            "trades": 59,
+            "win_rate": 42.4,
+            "profit_factor": 1.31,
+            "expectancy_r": 0.175,
+            "max_drawdown_r": 4.23
+          },
+          "TREND_DOWN": {
+            "trades": 84,
+            "win_rate": 27.4,
+            "profit_factor": 0.66,
+            "expectancy_r": -0.244,
+            "max_drawdown_r": 22.48
+          },
+          "TREND_UP": {
+            "trades": 103,
+            "win_rate": 44.7,
+            "profit_factor": 1.39,
+            "expectancy_r": 0.213,
+            "max_drawdown_r": 6.96
+          }
+        },
+        "full_by_regime": {
+          "LOW_VOLATILITY": {
+            "trades": 9,
+            "win_rate": 55.6,
+            "profit_factor": 2.35,
+            "expectancy_r": 0.631,
+            "max_drawdown_r": 1.08
+          },
+          "RANGE": {
+            "trades": 138,
+            "win_rate": 40.6,
+            "profit_factor": 1.29,
+            "expectancy_r": 0.173,
+            "max_drawdown_r": 9.49
+          },
+          "TRANSITION": {
+            "trades": 101,
+            "win_rate": 43.6,
+            "profit_factor": 1.4,
+            "expectancy_r": 0.227,
+            "max_drawdown_r": 4.23
+          },
+          "TREND_DOWN": {
+            "trades": 133,
+            "win_rate": 27.8,
+            "profit_factor": 0.66,
+            "expectancy_r": -0.247,
+            "max_drawdown_r": 36.7
+          },
+          "TREND_UP": {
+            "trades": 194,
+            "win_rate": 40.7,
+            "profit_factor": 1.19,
+            "expectancy_r": 0.114,
+            "max_drawdown_r": 14.77
+          }
+        },
+        "full_by_session": {
+          "asia": {
+            "trades": 174,
+            "win_rate": 40.2,
+            "profit_factor": 1.25,
+            "expectancy_r": 0.151,
+            "max_drawdown_r": 12.39
+          },
+          "london": {
+            "trades": 109,
+            "win_rate": 36.7,
+            "profit_factor": 1.13,
+            "expectancy_r": 0.086,
+            "max_drawdown_r": 9.59
+          },
+          "london_ny_overlap": {
+            "trades": 193,
+            "win_rate": 37.8,
+            "profit_factor": 1.01,
+            "expectancy_r": 0.009,
+            "max_drawdown_r": 12.39
+          },
+          "ny_late": {
+            "trades": 99,
+            "win_rate": 38.4,
+            "profit_factor": 1.07,
+            "expectancy_r": 0.045,
+            "max_drawdown_r": 11.93
+          }
+        },
+        "full_by_direction": {
+          "BUY": {
+            "trades": 363,
+            "win_rate": 43.5,
+            "profit_factor": 1.39,
+            "expectancy_r": 0.224,
+            "max_drawdown_r": 11.12
+          },
+          "SELL": {
+            "trades": 212,
+            "win_rate": 29.7,
+            "profit_factor": 0.73,
+            "expectancy_r": -0.187,
+            "max_drawdown_r": 45.7
+          }
+        },
+        "full_by_half_year": {
+          "2024H1": {
+            "trades": 95,
+            "win_rate": 31.6,
+            "profit_factor": 0.85,
+            "expectancy_r": -0.107,
+            "max_drawdown_r": 12.38
+          },
+          "2024H2": {
+            "trades": 102,
+            "win_rate": 39.2,
+            "profit_factor": 1.14,
+            "expectancy_r": 0.087,
+            "max_drawdown_r": 8.92
+          },
+          "2025H1": {
+            "trades": 104,
+            "win_rate": 38.5,
+            "profit_factor": 1.14,
+            "expectancy_r": 0.085,
+            "max_drawdown_r": 17.57
+          },
+          "2025H2": {
+            "trades": 105,
+            "win_rate": 41.0,
+            "profit_factor": 1.28,
+            "expectancy_r": 0.164,
+            "max_drawdown_r": 11.45
+          },
+          "2026H1": {
+            "trades": 108,
+            "win_rate": 41.7,
+            "profit_factor": 1.23,
+            "expectancy_r": 0.136,
+            "max_drawdown_r": 14.13
+          },
+          "2026H2": {
+            "trades": 61,
+            "win_rate": 37.7,
+            "profit_factor": 1.06,
+            "expectancy_r": 0.037,
+            "max_drawdown_r": 15.35
+          }
+        },
+        "trades_per_month": 17.07
+      },
+      "ts_momentum": {
+        "train": {
+          "trades": 66,
+          "win_rate": 37.9,
+          "profit_factor": 1.15,
+          "expectancy_r": 0.098,
+          "expectancy_r_ci95": [
+            -0.274,
+            0.48
+          ],
+          "max_drawdown_r": 13.89,
+          "max_drawdown_pct": 6.75,
+          "max_consecutive_losses": 11,
+          "avg_win_r": 1.93,
+          "avg_loss_r": -1.02,
+          "avg_mfe_r": 1.347,
+          "avg_mae_r": 0.965,
+          "total_cost_r": 2.74
+        },
+        "test": {
+          "trades": 85,
+          "win_rate": 31.8,
+          "profit_factor": 1.0,
+          "expectancy_r": -0.003,
+          "expectancy_r_ci95": [
+            -0.34,
+            0.336
+          ],
+          "max_drawdown_r": 11.07,
+          "max_drawdown_pct": 5.42,
+          "max_consecutive_losses": 9,
+          "avg_win_r": 2.166,
+          "avg_loss_r": -1.012,
+          "avg_mfe_r": 1.415,
+          "avg_mae_r": 1.213,
+          "total_cost_r": 1.44
+        },
+        "test_by_regime": {
+          "LOW_VOLATILITY": {
+            "trades": 1,
+            "win_rate": 0.0,
+            "profit_factor": 0.0,
+            "expectancy_r": -1.021,
+            "max_drawdown_r": 1.02
+          },
+          "TRANSITION": {
+            "trades": 21,
+            "win_rate": 33.3,
+            "profit_factor": 1.25,
+            "expectancy_r": 0.17,
+            "max_drawdown_r": 4.08
+          },
+          "TREND_DOWN": {
+            "trades": 38,
+            "win_rate": 28.9,
+            "profit_factor": 0.72,
+            "expectancy_r": -0.202,
+            "max_drawdown_r": 13.54
+          },
+          "TREND_UP": {
+            "trades": 25,
+            "win_rate": 36.0,
+            "profit_factor": 1.3,
+            "expectancy_r": 0.196,
+            "max_drawdown_r": 6.14
+          }
+        },
+        "full_by_regime": {
+          "LOW_VOLATILITY": {
+            "trades": 1,
+            "win_rate": 0.0,
+            "profit_factor": 0.0,
+            "expectancy_r": -1.021,
+            "max_drawdown_r": 1.02
+          },
+          "TRANSITION": {
+            "trades": 37,
+            "win_rate": 32.4,
+            "profit_factor": 1.24,
+            "expectancy_r": 0.167,
+            "max_drawdown_r": 6.2
+          },
+          "TREND_DOWN": {
+            "trades": 57,
+            "win_rate": 31.6,
+            "profit_factor": 0.76,
+            "expectancy_r": -0.17,
+            "max_drawdown_r": 16.01
+          },
+          "TREND_UP": {
+            "trades": 56,
+            "win_rate": 39.3,
+            "profit_factor": 1.31,
+            "expectancy_r": 0.192,
+            "max_drawdown_r": 9.63
+          }
+        },
+        "full_by_session": {
+          "asia": {
+            "trades": 52,
+            "win_rate": 28.8,
+            "profit_factor": 0.95,
+            "expectancy_r": -0.034,
+            "max_drawdown_r": 9.14
+          },
+          "london": {
+            "trades": 37,
+            "win_rate": 35.1,
+            "profit_factor": 0.92,
+            "expectancy_r": -0.05,
+            "max_drawdown_r": 8.2
+          },
+          "london_ny_overlap": {
+            "trades": 35,
+            "win_rate": 34.3,
+            "profit_factor": 1.05,
+            "expectancy_r": 0.03,
+            "max_drawdown_r": 8.13
+          },
+          "ny_late": {
+            "trades": 27,
+            "win_rate": 44.4,
+            "profit_factor": 1.57,
+            "expectancy_r": 0.326,
+            "max_drawdown_r": 4.18
+          }
+        },
+        "full_by_direction": {
+          "BUY": {
+            "trades": 76,
+            "win_rate": 36.8,
+            "profit_factor": 1.25,
+            "expectancy_r": 0.163,
+            "max_drawdown_r": 11.74
+          },
+          "SELL": {
+            "trades": 75,
+            "win_rate": 32.0,
+            "profit_factor": 0.88,
+            "expectancy_r": -0.082,
+            "max_drawdown_r": 19.14
+          }
+        },
+        "full_by_half_year": {
+          "2024H1": {
+            "trades": 28,
+            "win_rate": 25.0,
+            "profit_factor": 0.51,
+            "expectancy_r": -0.37,
+            "max_drawdown_r": 13.89
+          },
+          "2024H2": {
+            "trades": 26,
+            "win_rate": 57.7,
+            "profit_factor": 2.65,
+            "expectancy_r": 0.727,
+            "max_drawdown_r": 4.18
+          },
+          "2025H1": {
+            "trades": 27,
+            "win_rate": 25.9,
+            "profit_factor": 0.69,
+            "expectancy_r": -0.23,
+            "max_drawdown_r": 8.79
+          },
+          "2025H2": {
+            "trades": 19,
+            "win_rate": 36.8,
+            "profit_factor": 1.26,
+            "expectancy_r": 0.165,
+            "max_drawdown_r": 7.11
+          },
+          "2026H1": {
+            "trades": 36,
+            "win_rate": 36.1,
+            "profit_factor": 1.33,
+            "expectancy_r": 0.214,
+            "max_drawdown_r": 4.54
+          },
+          "2026H2": {
+            "trades": 15,
+            "win_rate": 20.0,
+            "profit_factor": 0.43,
+            "expectancy_r": -0.462,
+            "max_drawdown_r": 9.92
+          }
+        },
+        "trades_per_month": 4.48
+      },
+      "mean_reversion": {
+        "train": {
+          "trades": 2,
+          "win_rate": 50.0,
+          "profit_factor": 1.86,
+          "expectancy_r": 0.44,
+          "expectancy_r_ci95": [
+            -1.025,
+            1.905
+          ],
+          "max_drawdown_r": 1.03,
+          "max_drawdown_pct": 0.51,
+          "max_consecutive_losses": 1,
+          "avg_win_r": 1.905,
+          "avg_loss_r": -1.025,
+          "avg_mfe_r": 1.971,
+          "avg_mae_r": 0.918,
+          "total_cost_r": 0.1
+        },
+        "test": {
+          "trades": 5,
+          "win_rate": 60.0,
+          "profit_factor": 2.46,
+          "expectancy_r": 0.591,
+          "expectancy_r_ci95": [
+            -0.57,
+            1.754
+          ],
+          "max_drawdown_r": 1.02,
+          "max_drawdown_pct": 0.51,
+          "max_consecutive_losses": 1,
+          "avg_win_r": 1.663,
+          "avg_loss_r": -1.016,
+          "avg_mfe_r": 1.352,
+          "avg_mae_r": 0.874,
+          "total_cost_r": 0.12
+        },
+        "test_by_regime": {
+          "RANGE": {
+            "trades": 5,
+            "win_rate": 60.0,
+            "profit_factor": 2.46,
+            "expectancy_r": 0.591,
+            "max_drawdown_r": 1.02
+          }
+        },
+        "full_by_regime": {
+          "RANGE": {
+            "trades": 7,
+            "win_rate": 57.1,
+            "profit_factor": 2.25,
+            "expectancy_r": 0.548,
+            "max_drawdown_r": 1.03
+          }
+        },
+        "full_by_session": {
+          "asia": {
+            "trades": 3,
+            "win_rate": 66.7,
+            "profit_factor": 3.41,
+            "expectancy_r": 0.819,
+            "max_drawdown_r": 1.02
+          },
+          "london": {
+            "trades": 1,
+            "win_rate": 100.0,
+            "profit_factor": null,
+            "expectancy_r": 1.512,
+            "max_drawdown_r": 0.0
+          },
+          "london_ny_overlap": {
+            "trades": 1,
+            "win_rate": 0.0,
+            "profit_factor": 0.0,
+            "expectancy_r": -1.025,
+            "max_drawdown_r": 1.03
+          },
+          "ny_late": {
+            "trades": 2,
+            "win_rate": 50.0,
+            "profit_factor": 1.88,
+            "expectancy_r": 0.446,
+            "max_drawdown_r": 1.01
+          }
+        },
+        "full_by_direction": {
+          "SELL": {
+            "trades": 7,
+            "win_rate": 57.1,
+            "profit_factor": 2.25,
+            "expectancy_r": 0.548,
+            "max_drawdown_r": 1.03
+          }
+        },
+        "full_by_half_year": {
+          "2024H2": {
+            "trades": 2,
+            "win_rate": 50.0,
+            "profit_factor": 1.86,
+            "expectancy_r": 0.44,
+            "max_drawdown_r": 1.03
+          },
+          "2025H2": {
+            "trades": 5,
+            "win_rate": 60.0,
+            "profit_factor": 2.46,
+            "expectancy_r": 0.591,
+            "max_drawdown_r": 1.02
+          }
+        },
+        "trades_per_month": 0.21
+      },
+      "squeeze_break": {
+        "train": {
+          "trades": 124,
+          "win_rate": 32.3,
+          "profit_factor": 1.1,
+          "expectancy_r": 0.07,
+          "expectancy_r_ci95": [
+            -0.211,
+            0.364
+          ],
+          "max_drawdown_r": 11.8,
+          "max_drawdown_pct": 5.77,
+          "max_consecutive_losses": 7,
+          "avg_win_r": 2.399,
+          "avg_loss_r": -1.038,
+          "avg_mfe_r": 1.412,
+          "avg_mae_r": 1.097,
+          "total_cost_r": 7.09
+        },
+        "test": {
+          "trades": 184,
+          "win_rate": 34.2,
+          "profit_factor": 1.21,
+          "expectancy_r": 0.141,
+          "expectancy_r_ci95": [
+            -0.095,
+            0.382
+          ],
+          "max_drawdown_r": 13.37,
+          "max_drawdown_pct": 6.54,
+          "max_consecutive_losses": 9,
+          "avg_win_r": 2.341,
+          "avg_loss_r": -1.004,
+          "avg_mfe_r": 1.525,
+          "avg_mae_r": 1.098,
+          "total_cost_r": 4.72
+        },
+        "test_by_regime": {
+          "LOW_VOLATILITY": {
+            "trades": 8,
+            "win_rate": 62.5,
+            "profit_factor": 3.82,
+            "expectancy_r": 1.139,
+            "max_drawdown_r": 1.1
+          },
+          "RANGE": {
+            "trades": 76,
+            "win_rate": 35.5,
+            "profit_factor": 1.3,
+            "expectancy_r": 0.197,
+            "max_drawdown_r": 8.24
+          },
+          "TRANSITION": {
+            "trades": 36,
+            "win_rate": 25.0,
+            "profit_factor": 0.79,
+            "expectancy_r": -0.152,
+            "max_drawdown_r": 9.15
+          },
+          "TREND_DOWN": {
+            "trades": 31,
+            "win_rate": 32.3,
+            "profit_factor": 1.1,
+            "expectancy_r": 0.067,
+            "max_drawdown_r": 6.1
+          },
+          "TREND_UP": {
+            "trades": 33,
+            "win_rate": 36.4,
+            "profit_factor": 1.25,
+            "expectancy_r": 0.16,
+            "max_drawdown_r": 8.65
+          }
+        },
+        "full_by_regime": {
+          "LOW_VOLATILITY": {
+            "trades": 8,
+            "win_rate": 62.5,
+            "profit_factor": 3.82,
+            "expectancy_r": 1.139,
+            "max_drawdown_r": 1.1
+          },
+          "RANGE": {
+            "trades": 127,
+            "win_rate": 35.4,
+            "profit_factor": 1.31,
+            "expectancy_r": 0.201,
+            "max_drawdown_r": 8.25
+          },
+          "TRANSITION": {
+            "trades": 56,
+            "win_rate": 30.4,
+            "profit_factor": 1.05,
+            "expectancy_r": 0.032,
+            "max_drawdown_r": 9.75
+          },
+          "TREND_DOWN": {
+            "trades": 48,
+            "win_rate": 31.2,
+            "profit_factor": 0.99,
+            "expectancy_r": -0.01,
+            "max_drawdown_r": 7.77
+          },
+          "TREND_UP": {
+            "trades": 69,
+            "win_rate": 30.4,
+            "profit_factor": 0.98,
+            "expectancy_r": -0.017,
+            "max_drawdown_r": 13.82
+          }
+        },
+        "full_by_session": {
+          "asia": {
+            "trades": 88,
+            "win_rate": 33.0,
+            "profit_factor": 1.15,
+            "expectancy_r": 0.101,
+            "max_drawdown_r": 9.14
+          },
+          "london": {
+            "trades": 63,
+            "win_rate": 27.0,
+            "profit_factor": 0.89,
+            "expectancy_r": -0.081,
+            "max_drawdown_r": 10.64
+          },
+          "london_ny_overlap": {
+            "trades": 117,
+            "win_rate": 35.0,
+            "profit_factor": 1.22,
+            "expectancy_r": 0.148,
+            "max_drawdown_r": 7.74
+          },
+          "ny_late": {
+            "trades": 40,
+            "win_rate": 40.0,
+            "profit_factor": 1.56,
+            "expectancy_r": 0.341,
+            "max_drawdown_r": 5.78
+          }
+        },
+        "full_by_direction": {
+          "BUY": {
+            "trades": 179,
+            "win_rate": 35.8,
+            "profit_factor": 1.31,
+            "expectancy_r": 0.204,
+            "max_drawdown_r": 16.3
+          },
+          "SELL": {
+            "trades": 129,
+            "win_rate": 30.2,
+            "profit_factor": 0.98,
+            "expectancy_r": -0.013,
+            "max_drawdown_r": 18.96
+          }
+        },
+        "full_by_half_year": {
+          "2024H1": {
+            "trades": 50,
+            "win_rate": 30.0,
+            "profit_factor": 1.0,
+            "expectancy_r": -0.0,
+            "max_drawdown_r": 11.8
+          },
+          "2024H2": {
+            "trades": 50,
+            "win_rate": 34.0,
+            "profit_factor": 1.16,
+            "expectancy_r": 0.107,
+            "max_drawdown_r": 6.81
+          },
+          "2025H1": {
+            "trades": 51,
+            "win_rate": 33.3,
+            "profit_factor": 1.17,
+            "expectancy_r": 0.119,
+            "max_drawdown_r": 10.24
+          },
+          "2025H2": {
+            "trades": 62,
+            "win_rate": 40.3,
+            "profit_factor": 1.62,
+            "expectancy_r": 0.374,
+            "max_drawdown_r": 8.36
+          },
+          "2026H1": {
+            "trades": 62,
+            "win_rate": 35.5,
+            "profit_factor": 1.23,
+            "expectancy_r": 0.151,
+            "max_drawdown_r": 9.67
+          },
+          "2026H2": {
+            "trades": 33,
+            "win_rate": 21.2,
+            "profit_factor": 0.64,
+            "expectancy_r": -0.278,
+            "max_drawdown_r": 12.82
+          }
+        },
+        "trades_per_month": 9.14
+      }
+    },
+    "router": {
+      "table": {
+        "TREND_UP": {
+          "family": "ts_momentum",
+          "train_exp": 0.189,
+          "n": 31
+        },
+        "TRANSITION": {
+          "family": "squeeze_break",
+          "train_exp": 0.363,
+          "n": 20
+        },
+        "RANGE": {
+          "family": "donchian_break",
+          "train_exp": 0.207,
+          "n": 60
+        }
+      },
+      "test": {
+        "trades": 144,
+        "win_rate": 34.7,
+        "profit_factor": 1.09,
+        "expectancy_r": 0.06,
+        "expectancy_r_ci95": [
+          -0.182,
+          0.296
+        ],
+        "max_drawdown_r": 10.08,
+        "max_drawdown_pct": 4.94,
+        "max_consecutive_losses": 10,
+        "avg_win_r": 2.03,
+        "avg_loss_r": -0.988,
+        "avg_mfe_r": 1.281,
+        "avg_mae_r": 1.086,
+        "total_cost_r": 2.93
+      }
+    },
+    "router_walk_forward": {
+      "windows": [
+        {
+          "fit": [
+            "2024-02-01",
+            "2026-02-01"
+          ],
+          "table": {
+            "TREND_UP": "ts_momentum",
+            "TRANSITION": "donchian_break",
+            "RANGE": "squeeze_break",
+            "TREND_DOWN": "squeeze_break"
+          },
+          "oos_trades": 76,
+          "oos_expectancy_r": 0.033
+        },
+        {
+          "fit": [
+            "2024-08-01",
+            "2026-08-01"
+          ],
+          "table": {
+            "TREND_UP": "ts_momentum",
+            "TRANSITION": "donchian_break",
+            "RANGE": "donchian_break"
+          },
+          "oos_trades": 23,
+          "oos_expectancy_r": -0.271
+        }
+      ],
+      "pooled_trades": 99,
+      "pooled_expectancy_r": -0.037
+    }
+  }
+}
