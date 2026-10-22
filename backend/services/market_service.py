@@ -219,6 +219,10 @@ def upsert_candles(db, symbol: str, timeframe: str, rows: List[Dict[str, Any]]) 
     if not rows:
         return 0
 
+    # Providers occasionally repeat a timestamp in one response (seen: Twelvedata 1day);
+    # Postgres rejects ON CONFLICT batches that touch the same row twice → keep the last.
+    rows = list({row["timestamp"]: row for row in rows}.values())
+
     values = [
         {
             "symbol":    symbol,
