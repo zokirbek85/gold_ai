@@ -5,11 +5,17 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Activity, TrendingUp, LineChart, Zap, BarChart3,
   Newspaper, Calendar, FlaskConical, BookOpen, Brain,
-  Settings, Shield, LogOut, Telescope,
+  Settings, Shield, LogOut, Telescope, GraduationCap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_GROUPS = [
+  {
+    label: "Yordam",
+    items: [
+      { href: "/guide", icon: GraduationCap, label: "Qo‘llanma" },
+    ],
+  },
   {
     label: "Overview",
     items: [
