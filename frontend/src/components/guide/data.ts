@@ -276,6 +276,7 @@ export const CHECKLIST = [
 
 export const PAGES = [
   { href: "/signals", name: "Signals", use: "Asosiy sahifa: «Generate» bilan yangi signal olish va eski signallarni ko‘rish.", trust: "ha" },
+  { href: "/paper", name: "Paper Trading", use: "Tizimning virtual hisobdagi savdolari: balans, ochiq pozitsiya, natijalar, strategiya holati.", trust: "ha" },
   { href: "/dashboard", name: "Dashboard", use: "Umumiy ko‘rinish: narx, so‘nggi holat.", trust: "ha" },
   { href: "/charts", name: "Live Chart", use: "Narx grafigi — signaldagi darajalarni grafikda ko‘rish uchun.", trust: "ha" },
   { href: "/economic-calendar", name: "Econ Calendar", use: "Muhim yangiliklar vaqti. Savdodan oldin albatta tekshiring.", trust: "ha" },

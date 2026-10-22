@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Activity, TrendingUp, LineChart, Zap, BarChart3,
   Newspaper, Calendar, FlaskConical, BookOpen, Brain,
-  Settings, Shield, LogOut, Telescope, GraduationCap,
+  Settings, Shield, LogOut, Telescope, GraduationCap, FlaskRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +30,7 @@ const NAV_GROUPS = [
     items: [
       { href: "/signals", icon: Zap, label: "Signals" },
       { href: "/analysis", icon: BarChart3, label: "Market Analysis" },
+      { href: "/paper", icon: FlaskRound, label: "Paper Trading" },
       { href: "/journal", icon: BookOpen, label: "Trade Journal" },
       { href: "/backtesting", icon: FlaskConical, label: "Backtesting" },
     ],

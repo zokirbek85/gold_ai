@@ -74,6 +74,7 @@ export function LiveStatus() {
               Yopilgan savdolar: <b>{paper.data.trades}</b> · Ochiq/kutilayotgan: <b>{paper.data.open_or_pending}</b>
             </p>
             <p className="text-xs" style={{ color: "var(--text-faint)" }}>Holat: {paper.data.health?.status === "INSUFFICIENT_DATA" ? "xulosa uchun savdo kam" : paper.data.health?.status}</p>
+            <Link href="/paper" className="text-xs underline" style={{ color: "var(--gold)" }}>Barcha paper savdolar →</Link>
           </div>
         ) : <p className="text-sm" style={{ color: "var(--text-faint)" }}>{paper.isError ? "Ma'lumot olinmadi" : "Yuklanmoqda…"}</p>}
       </Box>
