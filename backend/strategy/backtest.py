@@ -47,9 +47,50 @@ class Trade:
     bars_held: int
     regime: str
     score: Optional[float]
+    mfe_r: float = 0.0          # max favourable excursion (R, mid prices)
+    mae_r: float = 0.0          # max adverse excursion (R, mid prices)
+    swap_r: float = 0.0
+    nights: int = 0
+    strategy: str = ""
+
+
+def _nights(entry_ts: pd.Timestamp, exit_ts: pd.Timestamp) -> int:
+    """Rollovers (21:00 UTC) crossed while open; Wednesday counts triple (weekend swap)."""
+    n, t = 0, entry_ts.normalize() + pd.Timedelta(hours=21)
+    if t <= entry_ts:
+        t += pd.Timedelta(days=1)
+    while t < exit_ts:
+        if t.dayofweek < 5:
+            n += 3 if t.dayofweek == 2 else 1
+        t += pd.Timedelta(days=1)
+    return n
 
 
 DecisionFn = Callable[[int], Optional[Dict[str, Any]]]
+
+
+def fill_price(side: int, open_mid: float, half: float, slip: float) -> float:
+    """Market entry: a long buys at ask (+half spread) plus slippage; a short the opposite."""
+    return open_mid + side * (half + slip)
+
+
+def step_exit(side: int, o: float, h: float, l: float, sl: float, tp: float,
+              half: float, slip: float, gap_check: bool = True):
+    """
+    One bar of position management, shared by the backtester and the paper broker.
+    The exit side is bid for a long and ask for a short (mid ∓ half spread).
+    Returns (exit_price, reason) or (None, None).
+    """
+    lo_exit, hi_exit, open_exit = l - side * half, h - side * half, o - side * half
+    if gap_check and ((side == 1 and open_exit <= sl) or (side == -1 and open_exit >= sl)):
+        return open_exit - side * slip, "SL_GAP"
+    sl_hit = (lo_exit <= sl) if side == 1 else (hi_exit >= sl)
+    tp_hit = (hi_exit >= tp) if side == 1 else (lo_exit <= tp)
+    if sl_hit:  # SL first when both are touched inside one bar (no tick data)
+        return sl - side * slip, ("SL_AMBIGUOUS" if tp_hit else "SL")
+    if tp_hit:
+        return tp, "TP"
+    return None, None
 
 
 def simulate(
@@ -98,39 +139,40 @@ def simulate(
             skipped["OPENED_BEYOND_LEVELS"] += 1
             i += 1
             continue
-        fill = o[j] + side * (half + slip)
+        fill = fill_price(side, o[j], half, slip)
 
         exit_price, reason, k = None, None, j
         last = min(j + max_hold_bars - 1, n - 1)
         for k in range(j, last + 1):
-            # the exit side is bid for a long, ask for a short: mid ∓ half spread
-            lo_exit, hi_exit, open_exit = l[k] - side * half, h[k] - side * half, o[k] - side * half
-            if k > j:  # gap through stop at the open
-                if (side == 1 and open_exit <= sl) or (side == -1 and open_exit >= sl):
-                    exit_price, reason = open_exit - side * slip, "SL_GAP"
-                    break
-            sl_hit = (lo_exit <= sl) if side == 1 else (hi_exit >= sl)
-            tp_hit = (hi_exit >= tp) if side == 1 else (lo_exit <= tp)
-            if sl_hit:  # SL first when both touched (conservative)
-                exit_price, reason = sl - side * slip, "SL" if not tp_hit else "SL_AMBIGUOUS"
-                break
-            if tp_hit:
-                exit_price, reason = tp, "TP"
+            exit_price, reason = step_exit(side, o[k], h[k], l[k], sl, tp, half, slip, gap_check=k > j)
+            if exit_price is not None:
                 break
         if exit_price is None:
             k = last
             reason = "TIME" if last - j + 1 == max_hold_bars else "OPEN_AT_END"
             exit_price = c[k] - side * half
 
-        pnl = side * (exit_price - fill) - comm
+        t_in, t_out = pd.Timestamp(ts[j]), pd.Timestamp(ts[k])
+        tf_delta = (pd.Timestamp(ts[min(k + 1, len(ts) - 1)]) - t_out) if k + 1 < len(ts) else pd.Timedelta(0)
+        nights = _nights(t_in, t_out + max(tf_delta, pd.Timedelta(0)))
+        swap = nights * (risk_cfg.swap_long if side == 1 else risk_cfg.swap_short)
+        pnl = side * (exit_price - fill) - comm + swap
         r = pnl / risk if risk > 0 else 0.0
-        cost = 2 * half + slip + (slip if reason.startswith("SL") else 0.0) + comm
+        cost = 2 * half + slip + (slip if reason.startswith("SL") else 0.0) + comm - swap
         cost_r = cost / risk if risk > 0 else 0.0
+        if side == 1:
+            mfe, mae = h[j:k + 1].max() - fill, fill - l[j:k + 1].min()
+        else:
+            mfe, mae = fill - l[j:k + 1].min(), h[j:k + 1].max() - fill
         trades.append(Trade(
             direction=d["action"], signal_time=ts[i], entry_time=ts[j], exit_time=ts[k],
             entry_ref=ref, fill=round(fill, 3), sl=sl, tp=tp, exit_price=round(exit_price, 3),
             exit_reason=reason, risk=round(risk, 3), r=round(r, 4), cost_r=round(cost_r, 4),
             bars_held=k - j + 1, regime=d.get("regime", ""), score=d.get("signal_score"),
+            mfe_r=round(max(mfe, 0.0) / risk, 3) if risk > 0 else 0.0,
+            mae_r=round(max(mae, 0.0) / risk, 3) if risk > 0 else 0.0,
+            swap_r=round(swap / risk, 4) if risk > 0 else 0.0, nights=nights,
+            strategy=d.get("strategy", ""),
         ))
         i = k  # flat again after bar k; the next decision may use bar k's close
     return {"trades": trades, "signals": signals, "skipped": dict(skipped),
@@ -156,6 +198,9 @@ def metrics(trades: List[Trade], risk_pct: float = 0.5) -> Dict[str, Any]:
         best = max(best, streak)
     cost_r = np.array([t.cost_r for t in trades])
     se = float(rs.std(ddof=1) / math.sqrt(n)) if n > 1 else float("nan")
+    rng = np.random.default_rng(12345)
+    boot = rng.choice(rs, size=(2000, n), replace=True).mean(axis=1) if n > 1 else np.array([rs.mean()])
+    ci_lo, ci_hi = (float(np.percentile(boot, 2.5)), float(np.percentile(boot, 97.5)))
     buckets = Counter()
     for r in rs:
         key = "≤-1R" if r <= -0.999 else "-1..0R" if r <= 0 else "0..1R" if r < 1 else "1..2R" if r < 2 else "≥2R"
@@ -166,7 +211,10 @@ def metrics(trades: List[Trade], risk_pct: float = 0.5) -> Dict[str, Any]:
         "profit_factor": round(float(gross_win / gross_loss), 2) if gross_loss > 0 else None,
         "expectancy_r": round(float(rs.mean()), 3),
         "expectancy_r_se": round(se, 3) if np.isfinite(se) else None,
+        "expectancy_r_ci95": [round(ci_lo, 3), round(ci_hi, 3)],
         "expectancy_r_gross": round(float((rs + cost_r).mean()), 3),
+        "avg_mfe_r": round(float(np.mean([getattr(t, "mfe_r", 0.0) for t in trades])), 3),
+        "avg_mae_r": round(float(np.mean([getattr(t, "mae_r", 0.0) for t in trades])), 3),
         "avg_win_r": round(float(wins.mean()), 3) if len(wins) else None,
         "avg_loss_r": round(float(losses.mean()), 3) if len(losses) else None,
         "total_r": round(float(rs.sum()), 2),

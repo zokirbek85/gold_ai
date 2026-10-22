@@ -84,6 +84,7 @@ def generate(
     account_balance: float = 10000.0,
     cfg: Optional[StrategyConfig] = None,
     risk: Optional[RiskConfig] = None,
+    health: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     cfg = cfg or StrategyConfig()
     risk = risk or RiskConfig()
@@ -117,6 +118,8 @@ def generate(
         "timezone": "UTC",
         "strategy_version": STRATEGY_VERSION,
         "config_hash": cfg.version_hash(),
+        "primary_tf": cfg.primary_tf,
+        "strategy_health": health,
         "timeframes": {"primary": TF_NAMES.get(cfg.primary_tf, str(cfg.primary_tf)),
                        "context": TF_NAMES.get(cfg.context_tf, str(cfg.context_tf))},
         "data_status": {"primary": p_rep.to_dict(), "context": c_rep.to_dict() if c_rep else None,
@@ -130,6 +133,11 @@ def generate(
         dec = SignalDecision(action=NO_TRADE, reason_codes=[code], reasons=[text])
         return _finish(base, dec, account_balance, risk)
 
+    if health and health.get("status") == "SUSPENDED":
+        return _blocked("STRATEGY_SUSPENDED", "Strategiya vaqtincha to'xtatilgan: " + "; ".join(health.get("reasons", [])))
+    if health and health.get("risk_multiplier", 1.0) < 1.0:
+        from dataclasses import replace as _replace
+        risk = _replace(risk, risk_pct=risk.risk_pct * float(health["risk_multiplier"]))
     if p_rep.status != OK:
         return _blocked(f"DATA_{p_rep.status}", f"{base['timeframes']['primary']} ma'lumotlari: {p_rep.status} {p_rep.issues}")
     if c_rep is None or c_rep.status != OK:
@@ -217,7 +225,7 @@ def legacy_view(sig: Dict[str, Any]) -> Dict[str, Any]:
     reasons = " | ".join(sig["reasons"][:6]) if sig["reasons"] else None
     return {
         "symbol": sig["instrument"],
-        "timeframe": str(StrategyConfig().primary_tf),
+        "timeframe": str(sig.get("primary_tf", 240)),
         "signal_type": action,
         "entry": entry if action != NO_TRADE else None,
         "stop_loss": sl if action != NO_TRADE else None,

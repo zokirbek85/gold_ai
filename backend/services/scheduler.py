@@ -94,13 +94,52 @@ def _retrain_ml() -> None:
         db.close()
 
 
+def _signal_cycle() -> None:
+    """Autonomous v2 decision once per hour (H4 bars close every 4 h; dedup makes reruns harmless)."""
+    import os
+    from database import SessionLocal
+    from services.signal_cycle import run_v2
+    db = SessionLocal()
+    try:
+        alerts = os.getenv("SIGNAL_CYCLE_ALERTS", "false").lower() in ("1", "true", "yes")
+        r = run_v2(db, "XAUUSD", alert=alerts)
+        log.info("Signal cycle: %s %s dup=%s paper=%s", r.get("signal_type"), r.get("reason_codes"),
+                 r.get("duplicate"), (r.get("paper") or {}).get("status"))
+    except Exception:
+        log.exception("Signal cycle failed")
+    finally:
+        db.close()
+
+
+def _paper_tick() -> None:
+    from database import SessionLocal
+    from paper.service import tick
+    db = SessionLocal()
+    try:
+        r = tick(db)
+        if r.get("status") not in ("idle", "disabled"):
+            log.info("Paper tick: %s", r)
+    except Exception:
+        log.exception("Paper tick failed")
+    finally:
+        db.close()
+
+
 def init_scheduler() -> BackgroundScheduler:
     global _scheduler
     if _scheduler is not None:
         return _scheduler
 
     _scheduler = BackgroundScheduler(timezone="UTC")
-    _scheduler.add_job(_refresh_candles, IntervalTrigger(minutes=5), id="candles", max_instances=1, replace_existing=True)
+    import os
+    from apscheduler.triggers.cron import CronTrigger
+    # Twelvedata free tier ≈ 800 requests/day: candles 3×96 + paper M5 ≤288 + cycle 2×24 ≈ 624/day
+    _scheduler.add_job(_refresh_candles, IntervalTrigger(minutes=int(os.getenv("CANDLE_REFRESH_MINUTES", "15"))),
+                       id="candles", max_instances=1, replace_existing=True)
+    if os.getenv("SIGNAL_CYCLE_ENABLED", "true").lower() in ("1", "true", "yes"):
+        _scheduler.add_job(_signal_cycle, CronTrigger(minute=3), id="signal_cycle", max_instances=1, replace_existing=True)
+    if os.getenv("PAPER_TRADING_ENABLED", "true").lower() in ("1", "true", "yes"):
+        _scheduler.add_job(_paper_tick, IntervalTrigger(minutes=5), id="paper_tick", max_instances=1, replace_existing=True)
     _scheduler.add_job(_refresh_news, IntervalTrigger(minutes=30), id="news", max_instances=1, replace_existing=True)
     _scheduler.add_job(_refresh_calendar, IntervalTrigger(hours=1), id="calendar", max_instances=1, replace_existing=True)
     _scheduler.add_job(_retrain_ml, IntervalTrigger(hours=24), id="ml_train", max_instances=1, replace_existing=True)

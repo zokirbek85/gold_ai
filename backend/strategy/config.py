@@ -108,6 +108,10 @@ class RiskConfig:
     spread: float = 0.30
     slippage: float = 0.10            # per fill
     commission_per_lot: float = 0.0   # round-turn, account currency
+    # Overnight financing in USD/oz per night held through 21:00 UTC (negative = cost).
+    # Broker-specific and usually negative for gold longs — 0 means "unknown", not "free".
+    swap_long: float = 0.0
+    swap_short: float = 0.0
     max_spread: float = 0.60
     max_spread_to_risk: float = 0.15  # spread must be < 15 % of SL distance
 

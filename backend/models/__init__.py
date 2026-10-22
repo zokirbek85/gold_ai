@@ -6,6 +6,7 @@ from models.economic_calendar import EconomicEvent
 from models.backtest import BacktestResult
 from models.ml_model import MLModel
 from models.system_log import SystemLog
+from models.paper import PaperAccount, PaperTrade
 
 __all__ = [
     "User",
@@ -16,4 +17,6 @@ __all__ = [
     "BacktestResult",
     "MLModel",
     "SystemLog",
+    "PaperAccount",
+    "PaperTrade",
 ]

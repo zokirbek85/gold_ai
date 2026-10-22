@@ -44,6 +44,7 @@ def _create_tables() -> None:
     import models.backtest
     import models.ml_model
     import models.system_log
+    import models.paper  # additive tables: paper_accounts, paper_trades
     Base.metadata.create_all(bind=engine)
 
     try:
@@ -159,6 +160,13 @@ async def lifespan(app: FastAPI):
     _create_tables()
     _create_admin_user()
 
+    # Strategy registry: register the built-in v2 baseline as champion if empty (idempotent)
+    try:
+        from strategy.registry import seed_baseline
+        log.info("Strategy champion: %s", seed_baseline()["id"])
+    except Exception:
+        log.exception("Strategy registry seed failed — code defaults will be used")
+
     # Start scheduler
     from services.scheduler import init_scheduler
     init_scheduler()
@@ -231,6 +239,7 @@ from routers.forecast import router as forecast_router
 from routers.telegram_service import router as telegram_router
 from routers.risk import router as risk_router
 from src.api.ml_feedback import router as ml_feedback_router
+from routers.paper import router as paper_router
 
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(market_data_router, prefix="/api/v1/market-data", tags=["Market Data"])
@@ -248,6 +257,7 @@ app.include_router(forecast_router, prefix="/api/v1/forecast", tags=["Forecast"]
 app.include_router(telegram_router, prefix="/api/v1/telegram", tags=["Telegram"])
 app.include_router(ml_feedback_router, prefix="/api/v1", tags=["ML Feedback"])
 app.include_router(risk_router, prefix="/api/v1/risk", tags=["Risk Management"])
+app.include_router(paper_router, prefix="/api/v1", tags=["Paper Trading & Readiness"])
 
 
 @app.get("/api/v1/health", tags=["Health"])

@@ -146,88 +146,13 @@ def generate(
     return _generate_v2(payload, db)
 
 
-def _live_price(symbol: str, max_age_s: float = 120.0):
-    """Twelvedata WS price if fresh. Its bid/ask are synthetic, so they are not used."""
-    from services.twelvedata_service import get_price
-    tick = get_price(symbol)
-    if not tick or not tick.get("price"):
-        return None, None
-    try:
-        ts = datetime.fromisoformat(str(tick.get("time")).replace("Z", "+00:00"))
-        if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
-        if (datetime.now(timezone.utc) - ts).total_seconds() > max_age_s:
-            return None, "twelvedata_ws_stale"
-    except ValueError:
-        return None, "twelvedata_ws_bad_time"
-    return float(tick["price"]), "twelvedata_ws"
-
-
 def _generate_v2(payload: GenerateSignalIn, db: Session) -> Dict[str, Any]:
-    from models.economic_calendar import EconomicEvent
-    from strategy.config import StrategyConfig
-    from strategy.live import generate as live_generate, legacy_view
-
-    cfg = StrategyConfig()
-    tf_p, tf_c = str(cfg.primary_tf), str(cfg.context_tf)
-    for tf, limit in ((tf_p, 500), (tf_c, 300)):
-        try:
-            fetch_and_store(db, payload.symbol, tf, limit=limit)
-        except Exception:
-            db.rollback()  # provider down → decide on stored data; staleness check will catch it
-    try:
-        refresh_calendar(db)
-    except Exception:
-        db.rollback()
-
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    events = [
-        {"event": e.event, "currency": e.currency, "impact": e.impact, "event_time": e.event_time}
-        for e in db.query(EconomicEvent).filter(
-            EconomicEvent.event_time >= now - timedelta(hours=2),
-            EconomicEvent.event_time <= now + timedelta(hours=2),
-        ).all()
-    ]
-    price, price_src = _live_price(payload.symbol)
-
-    sig = live_generate(
-        _load_candles(db, payload.symbol, tf_p, limit=1500),
-        _load_candles(db, payload.symbol, tf_c, limit=400),
-        symbol=payload.symbol, now=now, events=events,
-        live_price=price, live_price_source=price_src,
-        account_balance=payload.account_balance, cfg=cfg,
-    )
-    view = legacy_view(sig)
-    if payload.timeframe != tf_p:
-        sig["note"] = f"So'ralgan timeframe {payload.timeframe} e'tiborsiz qoldirildi: v2 faqat tasdiqlangan {tf_p} da ishlaydi"
-
-    # De-duplicate: one stored row (and one alert) per closed bar and decision
-    last = (db.query(Signal).filter(Signal.symbol == payload.symbol, Signal.timeframe == tf_p)
-            .order_by(Signal.created_at.desc()).first())
-    bar_close = datetime.fromisoformat(view["bar_close"]) if view.get("bar_close") else None
-    duplicate = bool(
-        last and bar_close and last.signal_type == view["signal_type"]
-        and _naive(last.created_at) >= bar_close
-        and (view["signal_type"] == "NO TRADE" or (last.entry == view["entry"] and last.stop_loss == view["stop_loss"]))
-    )
-    if duplicate:
-        sig_id, created = last.id, last.created_at
-    else:
-        cols = {c.name for c in Signal.__table__.columns}
-        row = Signal(**{k: v for k, v in view.items() if k in cols and k not in ("id", "created_at")})
-        db.add(row)
-        db.commit()
-        db.refresh(row)
-        sig_id, created = row.id, row.created_at
-
-    result = {**sig, **view, "id": sig_id, "created_at": created, "duplicate": duplicate}
-    if view["signal_type"] in ("BUY", "SELL") and not duplicate:
-        threading.Thread(target=alert_signal, args=(result,), daemon=True).start()
-    return result
-
-
-def _naive(ts: datetime) -> datetime:
-    return ts.astimezone(timezone.utc).replace(tzinfo=None) if ts.tzinfo else ts
+    from services.signal_cycle import run_v2
+    # module-level names are passed explicitly so tests can monkeypatch them here
+    return run_v2(db, payload.symbol, payload.account_balance,
+                  now=datetime.now(timezone.utc).replace(tzinfo=None),
+                  requested_tf=payload.timeframe, fetch_fn=fetch_and_store,
+                  calendar_fn=refresh_calendar, alert_fn=alert_signal)
 
 
 def _generate_legacy(payload: GenerateSignalIn, db: Session) -> Dict[str, Any]:
