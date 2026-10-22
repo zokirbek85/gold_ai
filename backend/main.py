@@ -14,6 +14,9 @@ from database import engine, Base, SessionLocal
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s")
 log = logging.getLogger(__name__)
+# httpx logs full request URLs at INFO; Telegram URLs contain the bot token
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 # ── Rate limiter (shared across all routers) ──────────────────────────────────
 limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
