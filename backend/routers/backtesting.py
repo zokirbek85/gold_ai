@@ -34,7 +34,12 @@ class BacktestOut(BaseModel):
 
 
 def _run_backtest(candles: list, window: int) -> Dict[str, Any]:
-    """Walk-forward backtest over candle window."""
+    """LEGACY backtest (SIGNAL_ENGINE=legacy only).
+
+    Known flaws, kept for comparison: no spread/slippage, 5-bar horizon with
+    unresolved trades silently dropped, overlapping trades, and
+    ``max_drawdown`` is the longest loss streak, not a drawdown.
+    """
     if len(candles) < window + 5:
         return {"error": f"Need at least {window + 5} candles"}
 
@@ -106,8 +111,90 @@ def _run_backtest(candles: list, window: int) -> Dict[str, Any]:
     }
 
 
+def _load(db: Session, symbol: str, timeframe: str, limit: int) -> list:
+    rows = (db.query(Candle).filter(Candle.symbol == symbol, Candle.timeframe == timeframe)
+            .order_by(Candle.timestamp.desc()).limit(limit).all())
+    return [{"timestamp": r.timestamp, "open": r.open, "high": r.high, "low": r.low,
+             "close": r.close, "volume": r.volume} for r in reversed(rows)]
+
+
+def run_v2_backtest(primary: list, context: list, window: int, balance: float = 10000.0) -> Dict[str, Any]:
+    """Cost-aware v2 backtest over the last ``window`` clean primary bars."""
+    from strategy.backtest import metrics as bt_metrics, simulate, v2_decider
+    from strategy.config import RiskConfig, StrategyConfig
+    from strategy.data_quality import clean_candles
+    from strategy.engine import attach_context, prepare_context, prepare_primary
+
+    cfg, rc = StrategyConfig(), RiskConfig()
+    p_df, p_rep = clean_candles(primary, cfg.primary_tf)
+    c_df, c_rep = clean_candles(context, cfg.context_tf)
+    if len(p_df) < cfg.min_history_bars + 20:
+        return {"error": f"Need ≥ {cfg.min_history_bars + 20} clean {cfg.primary_tf}m candles, have {len(p_df)}"}
+    p = attach_context(prepare_primary(p_df, cfg), prepare_context(c_df, cfg))
+    start = max(cfg.min_history_bars, len(p) - window)
+    res = simulate(p, v2_decider(p, cfg, rc), rc, cfg.max_hold_bars, start, len(p))
+    m = bt_metrics(res["trades"], rc.risk_pct)
+    trades = m.get("trades", 0)
+    wins = sum(1 for t in res["trades"] if t.r > 0)
+    total_pnl = None
+    if trades:
+        eq = balance
+        for t in res["trades"]:
+            eq *= 1 + t.r * rc.risk_pct / 100.0
+        total_pnl = round(eq - balance, 2)
+    return {
+        "name": f"v2 {cfg.primary_tf}m/{cfg.context_tf}m · costs incl.",
+        "engine": "v2",
+        "trade_count": trades,
+        "candle_count": len(p) - start,
+        "period": [str(p["timestamp"].iloc[start]), str(p["timestamp"].iloc[-1])],
+        "metrics": {
+            "total_trades": trades, "winning_trades": wins, "losing_trades": trades - wins,
+            "win_rate": m.get("win_rate"), "profit_factor": m.get("profit_factor"),
+            "max_drawdown_pct": m.get("max_drawdown_pct"), "avg_rr": m.get("avg_win_r"),
+            "expectancy_r": m.get("expectancy_r"), "total_pnl": total_pnl,
+            "sharpe_ratio": None, "sortino_ratio": None,  # not computed — not fabricated
+            **{k: v for k, v in m.items() if k not in ("trades", "win_rate", "profit_factor", "max_drawdown_pct")},
+        },
+        "costs": {"spread": rc.spread, "slippage": rc.slippage, "commission_per_lot": rc.commission_per_lot},
+        "data_quality": {"primary": p_rep.to_dict(), "context": c_rep.to_dict()},
+        "skipped": res["skipped"],
+        "warning": "Kam savdo soni — natija statistik jihatdan ishonchsiz bo'lishi mumkin" if trades < 100 else None,
+        # flat keys kept for older clients / BacktestResult table
+        "win_rate": round((m.get("win_rate") or 0) / 100, 4),
+        "profit_factor": m.get("profit_factor") or 0.0,
+        "total_trades": trades,
+        "avg_rr": m.get("avg_win_r") or 0.0,
+        "max_drawdown": m.get("max_drawdown_r") or 0.0,
+    }
+
+
 @router.post("/run")
 def run_backtest(payload: BacktestIn, db: Session = Depends(get_db)) -> Dict[str, Any]:
+    from config import settings
+    if settings.SIGNAL_ENGINE.lower() != "legacy":
+        from strategy.config import StrategyConfig
+        cfg = StrategyConfig()
+        window = max(100, payload.window)
+        result = run_v2_backtest(
+            _load(db, payload.symbol, str(cfg.primary_tf), window + 1500),
+            _load(db, payload.symbol, str(cfg.context_tf), 1000),
+            window,
+        )
+        if "error" in result:
+            raise HTTPException(status_code=422, detail=result["error"])
+        record = BacktestResult(
+            symbol=payload.symbol, timeframe=str(cfg.primary_tf),
+            win_rate=result["win_rate"], profit_factor=result["profit_factor"],
+            total_trades=result["total_trades"], avg_rr=result["avg_rr"],
+            max_drawdown=result["max_drawdown"],  # in R units for the v2 engine
+        )
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+        result["id"] = record.id
+        return result
+
     rows = (
         db.query(Candle)
         .filter(Candle.symbol == payload.symbol, Candle.timeframe == str(payload.timeframe))

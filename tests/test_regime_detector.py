@@ -57,8 +57,13 @@ class TestRegimeDetector:
         assert result.name == "TRENDING_DOWN"
 
     def test_volatile_regime(self, detector):
-        candles = _make_candles(80, trend=0.0, noise=25.0)
-        result = detector.detect(candles)
+        # VOLATILE is relative: ATR must jump versus its own recent average.
+        # (Constant noise=25 everywhere is not a volatility regime change.)
+        calm = _make_candles(65, trend=0.0, noise=2.0)
+        spike = _make_candles(15, trend=0.0, noise=25.0, seed=7)
+        offset = calm[-1]["close"] - spike[0]["open"]
+        spike = [{k: (v + offset if k != "volume" else v) for k, v in c.items()} for c in spike]
+        result = detector.detect(calm + spike)
         assert result.name == "VOLATILE"
 
     def test_insufficient_data_returns_ranging(self, detector):

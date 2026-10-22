@@ -64,8 +64,13 @@ class MarketRegimeDetector:
             return Regime(name="RANGING", strength=50.0, description="Insufficient data")
 
         adx_val   = self._adx(candles)
-        atr_now   = self._atr(candles[-15:])
-        atr_avg   = self._atr(candles[-50:]) if n >= 50 else atr_now
+        # Current ATR (last 14 TRs) vs the mean TR of the bars BEFORE them. The old
+        # baseline (Wilder ATR of the last 50 bars) was dominated by the same recent
+        # bars, so a volatility spike almost never reached the 1.5× threshold.
+        trs       = self._true_ranges(candles[-65:])
+        atr_now   = sum(trs[-14:]) / len(trs[-14:]) if trs else 0.0
+        base      = trs[:-14][-50:]
+        atr_avg   = sum(base) / len(base) if len(base) >= 14 else atr_now
         vol_ratio = (atr_now / atr_avg) if atr_avg > 0 else 1.0
 
         # Volatile regime takes priority over trend
@@ -145,6 +150,15 @@ class MarketRegimeDetector:
 
     # ── Indicators ────────────────────────────────────────────────────────────
 
+    @staticmethod
+    def _true_ranges(candles: List[Dict]) -> List[float]:
+        return [
+            max(float(candles[i]["high"]) - float(candles[i]["low"]),
+                abs(float(candles[i]["high"]) - float(candles[i - 1]["close"])),
+                abs(float(candles[i]["low"]) - float(candles[i - 1]["close"])))
+            for i in range(1, len(candles))
+        ]
+
     def _atr(self, candles: List[Dict], period: int = 14) -> float:
         if len(candles) < 2:
             return 0.0
@@ -202,8 +216,10 @@ class MarketRegimeDetector:
         if len(dx_list) < period:
             return 20.0
 
-        adx_vals = _wilder_smooth(dx_list, period)
-        return round(adx_vals[-1], 1) if adx_vals else 20.0
+        adx_v = sum(dx_list[:period]) / period
+        for dx in dx_list[period:]:
+            adx_v = (adx_v * (period - 1) + dx) / period
+        return round(adx_v, 1)
 
     def _price_slope(self, candles: List[Dict]) -> float:
         """Linear regression slope of close prices (positive = uptrend)."""

@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     SIGNAL_BUY_THRESHOLD: float = 62.0
     SIGNAL_SELL_THRESHOLD: float = 38.0
     SIGNAL_MIN_CONFIDENCE: float = 65.0
+    # "v2" = backend/strategy (default), "legacy" = weighted-score engine in signal_service
+    SIGNAL_ENGINE: str = "v2"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

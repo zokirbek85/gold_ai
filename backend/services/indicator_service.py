@@ -132,6 +132,8 @@ def compute_snapshot(candles: List[Dict[str, Any]]) -> Dict[str, Optional[float]
         "rsi": _safe(rsi),
         "macd": _safe(macd_data["macd"]),
         "macd_signal": _safe(macd_data["macd_signal"]),
+        "macd_hist": _safe(macd_data["macd"] - macd_data["macd_signal"])
+        if macd_data["macd"] is not None and macd_data["macd_signal"] is not None else None,
         "ema_20": _safe(e20),
         "ema_50": _safe(e50),
         "ema_200": _safe(e200),

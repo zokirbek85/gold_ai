@@ -46,7 +46,8 @@ class AlertFilter:
         if sig_type == "NO TRADE":
             return False, "no_trade"
 
-        if confidence < self.MIN_CONFIDENCE:
+        # v2 signals carry an unvalidated signal_score, not a confidence — don't gate on it
+        if signal.get("signal_score") is None and confidence < self.MIN_CONFIDENCE:
             return False, f"low_confidence_{confidence:.0f}"
 
         last      = self._last_signal.get(symbol, {})
@@ -739,7 +740,8 @@ def _send_signal_message(chat_id: str, d: Dict[str, Any]) -> None:
     # Prefer human-readable plain_explanation if available
     plain = d.get("plain_explanation")
     if plain:
-        header_ts = f"*XAUUSD · H1 | {datetime.utcnow().strftime('%d %b %H:%M UTC')}*\n\n"
+        tf_name = {"60": "H1", "240": "H4", "15": "M15", "1440": "D1"}.get(str(d.get("timeframe")), str(d.get("timeframe")))
+        header_ts = f"*{d.get('symbol', 'XAUUSD')} · {tf_name} | {datetime.utcnow().strftime('%d %b %H:%M UTC')}*\n\n"
         send(chat_id, header_ts + plain, buttons=kb)
         return
 

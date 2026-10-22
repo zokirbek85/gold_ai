@@ -70,13 +70,13 @@ def _get_api_key() -> str:
     return os.getenv("TWELVEDATA_API_KEY", "").strip()
 
 
-def _parse_td_dt(dt_str: str) -> datetime:
+def _parse_td_dt(dt_str: str) -> Optional[datetime]:
     try:
         if " " in dt_str:
             return datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
         return datetime.strptime(dt_str, "%Y-%m-%d")
     except ValueError:
-        return datetime.utcnow()
+        return None
 
 
 def fetch_twelvedata(symbol: str, interval: str, outputsize: int = 200) -> List[Dict[str, Any]]:
@@ -111,9 +111,13 @@ def fetch_twelvedata(symbol: str, interval: str, outputsize: int = 200) -> List[
 
     result = []
     for v in data.get("values", []):
+        ts = _parse_td_dt(str(v.get("datetime", "")))
+        if ts is None:
+            log.warning("Twelvedata: skipping row with bad datetime %r", v.get("datetime"))
+            continue
         try:
             result.append({
-                "timestamp": _parse_td_dt(v["datetime"]),
+                "timestamp": ts,
                 "open":   float(v["open"]),
                 "high":   float(v["high"]),
                 "low":    float(v["low"]),

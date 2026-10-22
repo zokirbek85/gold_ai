@@ -571,6 +571,7 @@ def _build_signal(
         sl = round(struct_sl + atr * 0.1, 4)
 
     sl_pips = round(abs(close - sl) / 0.1, 1)
+    sl_dist = abs(close - sl)  # actual risk including the structure buffer
 
     # TPs at minimum RR ratios
     if direction == "BUY":

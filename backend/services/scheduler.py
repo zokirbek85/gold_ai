@@ -23,6 +23,7 @@ def _refresh_candles() -> None:
     db = SessionLocal()
     try:
         fetch_and_store(db, "XAUUSD", "60", limit=10)
+        fetch_and_store(db, "XAUUSD", "240", limit=10)
         fetch_and_store(db, "XAUUSD", "1440", limit=10)
         log.debug("Candle refresh complete")
     except Exception:
@@ -66,10 +67,11 @@ def _retrain_ml() -> None:
         rows = (
             db.query(Candle)
             .filter(Candle.symbol == "XAUUSD", Candle.timeframe == "60")
-            .order_by(Candle.timestamp.asc())
+            .order_by(Candle.timestamp.desc())
             .limit(1000)
             .all()
         )
+        rows = list(reversed(rows))
         if len(rows) < 200:
             return
         candles = [{"open": r.open, "high": r.high, "low": r.low, "close": r.close, "volume": r.volume} for r in rows]

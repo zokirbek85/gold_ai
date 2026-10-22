@@ -32,12 +32,12 @@ def _parse_ff_date(date_str: str) -> Optional[datetime]:
     if not date_str:
         return None
     try:
-        # ISO 8601 with timezone: "2026-05-31T08:30:00-04:00"
+        # ISO 8601 with timezone: "2026-05-31T08:30:00-04:00" → naive UTC
         from datetime import timezone as tz
-        import re
-        # Strip timezone offset and parse as UTC
-        clean = re.sub(r"[+-]\d{2}:\d{2}$", "", date_str).replace("T", " ").strip()
-        return datetime.strptime(clean, "%Y-%m-%d %H:%M:%S")
+        parsed = datetime.fromisoformat(date_str.strip().replace("Z", "+00:00"))
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone(tz.utc).replace(tzinfo=None)
+        return parsed
     except ValueError:
         pass
     try:
