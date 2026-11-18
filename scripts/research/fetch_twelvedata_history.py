@@ -2,7 +2,7 @@ import os, sys, time, httpx, csv
 key=os.environ["TWELVEDATA_API_KEY"]; interval=sys.argv[1]; pages=int(sys.argv[2]); out=sys.argv[3]
 rows={}; end=None
 for p in range(pages):
-    params={"symbol":"XAU/USD","interval":interval,"outputsize":5000,"apikey":key,"format":"JSON","timezone":"UTC","order":"desc"}
+    params={"symbol":os.environ.get("SYMBOL","XAU/USD"),"interval":interval,"outputsize":5000,"apikey":key,"format":"JSON","timezone":"UTC","order":"desc"}
     if end: params["end_date"]=end
     d=httpx.get("https://api.twelvedata.com/time_series",params=params,timeout=60).json()
     if d.get("status")=="error": print("err",d.get("code"),d.get("message")[:120]); break
