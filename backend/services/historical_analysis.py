@@ -96,6 +96,7 @@ def monthly_seasonality(db: Session, symbol: str, month: int) -> Dict[str, Any]:
         }
     except Exception as exc:
         log.warning("monthly_seasonality error: %s", exc)
+        db.rollback()  # a failed statement must not poison later queries in this session
         return {"insufficient_data": True}
 
 
@@ -127,7 +128,9 @@ def event_impact_analysis(db: Session, symbol: str, event_keywords: List[str]) -
             post_time = et + timedelta(hours=24)
 
             def _close_near(ts: datetime) -> Optional[float]:
-                row = (
+                # Nearest bar picked in Python: SQLite's strftime('%s') does not exist in
+                # Postgres and aborted the whole session's transaction.
+                rows = (
                     db.query(Candle)
                     .filter(
                         Candle.symbol    == symbol,
@@ -135,9 +138,9 @@ def event_impact_analysis(db: Session, symbol: str, event_keywords: List[str]) -
                         Candle.timestamp >= ts - timedelta(hours=2),
                         Candle.timestamp <= ts + timedelta(hours=2),
                     )
-                    .order_by(func.abs(func.strftime("%s", Candle.timestamp) - func.strftime("%s", ts)))
-                    .first()
+                    .all()
                 )
+                row = min(rows, key=lambda r: abs((r.timestamp - ts).total_seconds()), default=None)
                 return float(row.close) if row else None
 
             pre_close  = _close_near(pre_time)
@@ -175,6 +178,7 @@ def event_impact_analysis(db: Session, symbol: str, event_keywords: List[str]) -
         }
     except Exception as exc:
         log.warning("event_impact_analysis error: %s", exc)
+        db.rollback()  # a failed statement must not poison later queries in this session
         return {"insufficient_data": True}
 
 
@@ -247,6 +251,7 @@ def zone_test_analysis(
         }
     except Exception as exc:
         log.warning("zone_test_analysis error: %s", exc)
+        db.rollback()  # a failed statement must not poison later queries in this session
         return {
             "zone_price":      round(zone_price, 4),
             "touches":         0,
