@@ -69,6 +69,7 @@ def _create_tables() -> None:
     import models.system_log
     import models.paper  # additive tables: paper_accounts, paper_trades
     import models.shadow  # additive table: shadow_signals
+    import models.broker  # additive table: broker_quotes
     Base.metadata.create_all(bind=engine)
     _add_missing_columns()
 
@@ -265,6 +266,7 @@ from routers.telegram_service import router as telegram_router
 from routers.risk import router as risk_router
 from src.api.ml_feedback import router as ml_feedback_router
 from routers.paper import router as paper_router
+from routers.broker import router as broker_router
 
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(market_data_router, prefix="/api/v1/market-data", tags=["Market Data"])
@@ -283,6 +285,7 @@ app.include_router(telegram_router, prefix="/api/v1/telegram", tags=["Telegram"]
 app.include_router(ml_feedback_router, prefix="/api/v1", tags=["ML Feedback"])
 app.include_router(risk_router, prefix="/api/v1/risk", tags=["Risk Management"])
 app.include_router(paper_router, prefix="/api/v1", tags=["Paper Trading & Readiness"])
+app.include_router(broker_router, prefix="/api/v1/broker", tags=["Broker Costs"])
 
 
 @app.get("/api/v1/health", tags=["Health"])

@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     SIGNAL_MIN_TF_MINUTES: int = 60
     SIGNAL_MIN_RR: float = 1.5
 
+    # MetaTrader cost-feed EA → POST /api/v1/broker/quotes (header X-Feed-Token). Empty = feed disabled.
+    BROKER_FEED_TOKEN: str = ""
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
     def get_db_url(self) -> str:

@@ -8,6 +8,7 @@ from models.ml_model import MLModel
 from models.system_log import SystemLog
 from models.paper import PaperAccount, PaperTrade
 from models.shadow import ShadowSignal
+from models.broker import BrokerQuote
 
 __all__ = [
     "User",
@@ -20,5 +21,6 @@ __all__ = [
     "SystemLog",
     "PaperAccount",
     "ShadowSignal",
+    "BrokerQuote",
     "PaperTrade",
 ]
