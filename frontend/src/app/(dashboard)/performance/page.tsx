@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { Gauge, LineChart as LineIcon, ListChecks, Target } from "lucide-react";
+import { Eye, Gauge, LineChart as LineIcon, ListChecks, Target } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card, CardHeader, EmptyState, PageHeader, SignalBadge, StatCard } from "@/components/ui";
 import { Callout, Tabs, fmt } from "@/components/guide/Basics";
@@ -56,6 +56,73 @@ const tone = (v: number | null | undefined) =>
   v === null || v === undefined || v === 0 ? "var(--text)" : v > 0 ? "var(--green)" : "var(--red)";
 
 type Range = "all" | "90" | "30";
+
+interface Shadow {
+  strategy: string; started: string | null; signals: number; open: number; not_filled: number;
+  forward: Summary; lab: { lab_test_expectancy_r?: number; lab_train_expectancy_r?: number; control_p90_r?: number };
+  acceptance: { checks: Record<string, boolean>; passed: boolean; progress: string };
+  trades: { id: number; side: string; bar_close: string; entry: number; stop_loss: number; take_profit: number;
+            status: string; outcome: string | null; r: number | null; mfe_r: number | null }[];
+}
+
+const SHADOW_CHECK: Record<string, string> = {
+  forward_trades_ge_30: "Kamida 30 ta forward natija",
+  ci95_low_gt_0: "95% oraliqning pastki chegarasi > 0",
+  beats_random_control_p90: "Trend bo‘yicha tasodifiy savdodan yaxshi (p90)",
+};
+
+function ShadowCard() {
+  const q = useQuery<Shadow>({ queryKey: ["shadow-perf"], queryFn: () => api.get("/shadow/performance").then(r => r.data), refetchInterval: 300_000 });
+  const s = q.data;
+  const f = s?.forward;
+  return (
+    <Card>
+      <div className="p-4 space-y-3">
+        <CardHeader icon={<Eye className="w-4 h-4" />} title="Shadow kuzatuv: H1 squeeze + D1 trend"
+                    action={s ? <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{s.acceptance.progress} natija</span> : undefined} />
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Bu strategiya bilan <b>savdo qilinmaydi</b> va Telegram signali yuborilmaydi. Har soat oxirgi H1 sham bo‘yicha backtestdagidek qaror yoziladi va natijasi o‘lchanadi.
+          Laboratoriyada: test {signed(s?.lab.lab_test_expectancy_r, 2, "R")}, train {signed(s?.lab.lab_train_expectancy_r, 2, "R")} — shuning uchun hozircha faqat kuzatuv.
+          {s?.started ? ` Kuzatuv boshlangan: ${when(s.started)}.` : " Birinchi signal hali chiqmagan (o‘rtacha oyiga ~3 ta)."}
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div><p className="text-xs" style={{ color: "var(--text-faint)" }}>Signallar</p><p className="font-mono">{s?.signals ?? "—"} <span className="text-xs" style={{ color: "var(--text-faint)" }}>({s?.open ?? 0} ochiq)</span></p></div>
+          <div><p className="text-xs" style={{ color: "var(--text-faint)" }}>Win rate</p><p className="font-mono">{f?.win_rate !== undefined ? `${fmt(f.win_rate, 0)}%` : "—"}</p></div>
+          <div><p className="text-xs" style={{ color: "var(--text-faint)" }}>O‘rtacha natija</p><p className="font-mono" style={{ color: tone(f?.expectancy_r) }}>{signed(f?.expectancy_r, 2, "R")}</p></div>
+          <div><p className="text-xs" style={{ color: "var(--text-faint)" }}>Jami</p><p className="font-mono" style={{ color: tone(f?.total_r) }}>{signed(f?.total_r, 1, "R")}</p></div>
+        </div>
+        <ul className="text-xs space-y-1">
+          {Object.entries(s?.acceptance.checks ?? {}).map(([k, ok]) => (
+            <li key={k} style={{ color: ok ? "var(--green)" : "var(--text-faint)" }}>{ok ? "✓" : "○"} {SHADOW_CHECK[k] ?? k}</li>
+          ))}
+        </ul>
+        {!!s?.trades.length && (
+          <div className="overflow-x-auto">
+            <table className="data-table w-full text-sm">
+              <thead><tr><th className="text-left">Sham yopilishi</th><th className="text-left">Yo‘nalish</th><th className="text-right">Kirish</th>
+                <th className="text-right">SL</th><th className="text-right">TP</th><th className="text-left">Natija</th><th className="text-right">R</th></tr></thead>
+              <tbody>
+                {[...s.trades].reverse().map(t => {
+                  const oc = t.status === "open" ? ["Ochiq / kutilmoqda", "var(--blue)"] : (OUTCOME[t.outcome ?? ""] ?? [t.outcome ?? "—", "var(--text-muted)"]);
+                  return (
+                    <tr key={t.id}>
+                      <td className="text-xs whitespace-nowrap">{when(t.bar_close)}</td><td><SignalBadge type={t.side} /></td>
+                      <td className="text-right font-mono text-xs">{fmt(t.entry)}</td>
+                      <td className="text-right font-mono text-xs" style={{ color: "var(--red)" }}>{fmt(t.stop_loss)}</td>
+                      <td className="text-right font-mono text-xs" style={{ color: "var(--green)" }}>{fmt(t.take_profit)}</td>
+                      <td className="text-xs" style={{ color: oc[1] }}>{oc[0]}</td>
+                      <td className="text-right font-mono text-xs" style={{ color: tone(t.r) }}>{signed(t.r, 2, "R")}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
 
 function GroupTable({ title, data, label }: { title: string; data: Record<string, Summary>; label: (k: string) => string }) {
   const rows = Object.entries(data ?? {});
@@ -204,6 +271,8 @@ export default function PerformancePage() {
         <GroupTable title="Sessiya bo‘yicha (signal vaqti, UTC)" data={p?.by_session ?? {}} label={k => SESSION[k] ?? k} />
         <GroupTable title="Oy bo‘yicha" data={p?.by_month ?? {}} label={k => k} />
       </div>
+
+      <ShadowCard />
 
       <Card>
         <div className="p-4">

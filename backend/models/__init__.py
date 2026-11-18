@@ -7,6 +7,7 @@ from models.backtest import BacktestResult
 from models.ml_model import MLModel
 from models.system_log import SystemLog
 from models.paper import PaperAccount, PaperTrade
+from models.shadow import ShadowSignal
 
 __all__ = [
     "User",
@@ -18,5 +19,6 @@ __all__ = [
     "MLModel",
     "SystemLog",
     "PaperAccount",
+    "ShadowSignal",
     "PaperTrade",
 ]

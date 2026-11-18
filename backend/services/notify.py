@@ -99,6 +99,16 @@ def daily_summary_text(db, now: Optional[datetime] = None) -> str:
     if perf.get("trades"):
         lines.append(f"Signal natijalari (30 kun): {perf['trades']} ta, win {_f(perf.get('win_rate'), 0)}%, "
                      f"o'rtacha {_f(perf.get('expectancy_r'))}R")
+    try:
+        from services.shadow import performance as shadow_perf
+        sp = shadow_perf(db, "squeeze_trend")
+        fwd = sp["forward"]
+        line = f"Shadow squeeze\\_trend (savdo qilinmaydi): {sp['acceptance']['progress']} natija"
+        if fwd.get("trades"):
+            line += f", o'rtacha {_f(fwd.get('expectancy_r'))}R"
+        lines += ["", line]
+    except Exception:
+        db.rollback()
     bad = [k for k, v in wd["checks"].items() if not v.get("ok", True)]
     lines += ["", "Tizim: " + ("✅ hammasi ishlayapti" if not bad else "⚠️ muammo: " + ", ".join(watchdog.LABEL.get(b, b) for b in bad))]
     return "\n".join(lines)

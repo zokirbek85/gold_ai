@@ -68,6 +68,7 @@ def _create_tables() -> None:
     import models.ml_model
     import models.system_log
     import models.paper  # additive tables: paper_accounts, paper_trades
+    import models.shadow  # additive table: shadow_signals
     Base.metadata.create_all(bind=engine)
     _add_missing_columns()
 
@@ -298,6 +299,18 @@ def watchdog_status():
     out["websocket_connected"] = is_connected()
     out["last_tick"] = get_price("XAUUSD")
     return out
+
+
+@app.get("/api/v1/shadow/performance", tags=["Shadow"])
+def shadow_performance(strategy: str = "squeeze_trend"):
+    """Forward (never traded) results of a candidate strategy vs its pre-registered acceptance."""
+    from database import SessionLocal
+    from services.shadow import performance
+    db = SessionLocal()
+    try:
+        return performance(db, strategy)
+    finally:
+        db.close()
 
 
 @app.get("/api/v1/system/market-watch", tags=["Health"])
