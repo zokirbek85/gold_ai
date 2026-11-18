@@ -169,6 +169,26 @@ def _daily_summary() -> None:
         db.close()
 
 
+def _market_watch() -> None:
+    from services.market_watch import run
+    run()
+
+
+def _collect_m5() -> None:
+    """Keep the stored M5 series continuous (signal outcomes walk M5 paths).
+    Paper ticks only fetch M5 while a trade is open; 40 bars every 3 h overlap safely."""
+    from database import SessionLocal
+    from services.market_service import fetch_and_store
+    db = SessionLocal()
+    try:
+        fetch_and_store(db, "XAUUSD", "5", limit=40)
+    except Exception:
+        log.exception("M5 collection failed")
+        raise
+    finally:
+        db.close()
+
+
 def _tracked(job_id: str, fn):
     """Jobs log their own exceptions and re-raise; this records the outcome for the
     watchdog and swallows the error so APScheduler does not log it a second time."""
@@ -194,7 +214,7 @@ def init_scheduler() -> BackgroundScheduler:
     import os
     from apscheduler.triggers.cron import CronTrigger
     # Twelvedata free tier ≈ 800 requests/day: candles 3×96 + paper M5 ≤288 + cycle 2×24
-    # + signal outcomes ≤48 (M5, only while a recent signal is unresolved) ≈ 672/day
+    # + signal outcomes ≤48 (M5, only while a recent signal is unresolved) + M5 collect 8 ≈ 680/day
     _scheduler.add_job(_tracked("candles", _refresh_candles), IntervalTrigger(minutes=int(os.getenv("CANDLE_REFRESH_MINUTES", "15"))),
                        id="candles", max_instances=1, replace_existing=True)
     if os.getenv("SIGNAL_CYCLE_ENABLED", "true").lower() in ("1", "true", "yes"):
@@ -206,6 +226,11 @@ def init_scheduler() -> BackgroundScheduler:
     _scheduler.add_job(_tracked("news", _refresh_news), IntervalTrigger(minutes=30), id="news", max_instances=1, replace_existing=True)
     _scheduler.add_job(_tracked("calendar", _refresh_calendar), IntervalTrigger(hours=1), id="calendar", max_instances=1, replace_existing=True)
     _scheduler.add_job(_tracked("ml_train", _retrain_ml), IntervalTrigger(hours=24), id="ml_train", max_instances=1, replace_existing=True)
+    if os.getenv("MARKET_WATCH_ENABLED", "true").lower() in ("1", "true", "yes"):
+        _scheduler.add_job(_tracked("market_watch", _market_watch), IntervalTrigger(minutes=1), id="market_watch",
+                           max_instances=1, replace_existing=True)
+    _scheduler.add_job(_tracked("m5_collect", _collect_m5), IntervalTrigger(hours=3), id="m5_collect",
+                       max_instances=1, replace_existing=True)
     _scheduler.add_job(_watchdog, IntervalTrigger(minutes=2), id="watchdog", max_instances=1, replace_existing=True)
     if os.getenv("DAILY_SUMMARY_ENABLED", "true").lower() in ("1", "true", "yes"):
         # after the NY close, Mon–Fri

@@ -298,3 +298,10 @@ def watchdog_status():
     out["websocket_connected"] = is_connected()
     out["last_tick"] = get_price("XAUUSD")
     return out
+
+
+@app.get("/api/v1/system/market-watch", tags=["Health"])
+def market_watch_snapshot():
+    """Last real-time watcher snapshot: price, 15-min move, H1 ATR vs median, PDH/PDL, upcoming USD news."""
+    from services.market_watch import snapshot
+    return snapshot()

@@ -97,6 +97,11 @@ def _run_ws(api_key: str):
                 }
                 with _lock:
                     _prices[our_sym] = entry
+                try:  # feed the real-time watcher (arrival time; WS timestamps are minute-rounded)
+                    from services.market_watch import on_tick
+                    on_tick(our_sym, price)
+                except Exception:
+                    log.debug("market_watch tick feed failed", exc_info=True)
                 log.debug("TD price: %s = %.4f", our_sym, price)
 
             elif event == "subscribe-status":
