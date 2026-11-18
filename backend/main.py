@@ -38,6 +38,26 @@ if settings.SENTRY_DSN:
         log.warning("Sentry init failed: %s", exc)
 
 
+def _add_missing_columns() -> None:
+    """create_all() never alters existing tables. Add nullable columns that newer
+    models declare (alembic 0007+) so an existing DB keeps working without a manual
+    migration. Additive only: never drops or changes a column."""
+    from sqlalchemy import inspect, text
+    import models.signal
+    insp = inspect(engine)
+    for table in (models.signal.Signal.__table__,):
+        if not insp.has_table(table.name):
+            continue
+        existing = {c["name"] for c in insp.get_columns(table.name)}
+        for col in table.columns:
+            if col.name in existing or not col.nullable:
+                continue
+            ddl = f'ALTER TABLE {table.name} ADD COLUMN {col.name} {col.type.compile(dialect=engine.dialect)}'
+            with engine.begin() as conn:
+                conn.execute(text(ddl))
+            log.info("Schema: added column %s.%s", table.name, col.name)
+
+
 def _create_tables() -> None:
     import models.user
     import models.candle
@@ -49,6 +69,7 @@ def _create_tables() -> None:
     import models.system_log
     import models.paper  # additive tables: paper_accounts, paper_trades
     Base.metadata.create_all(bind=engine)
+    _add_missing_columns()
 
     try:
         from src.machine_learning.feedback_models import Base as FeedbackBase
@@ -266,3 +287,14 @@ app.include_router(paper_router, prefix="/api/v1", tags=["Paper Trading & Readin
 @app.get("/api/v1/health", tags=["Health"])
 def health():
     return {"status": "ok", "service": "gold-ai", "version": "3.0.0"}
+
+
+@app.get("/api/v1/system/watchdog", tags=["Health"])
+def watchdog_status():
+    """Background-system health: live price, H1 candles, scheduler job failures."""
+    from services import watchdog
+    from services.twelvedata_service import get_price, is_connected
+    out = watchdog.status()
+    out["websocket_connected"] = is_connected()
+    out["last_tick"] = get_price("XAUUSD")
+    return out

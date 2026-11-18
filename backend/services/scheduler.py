@@ -28,6 +28,7 @@ def _refresh_candles() -> None:
         log.debug("Candle refresh complete")
     except Exception:
         log.exception("Candle refresh failed")
+        raise
     finally:
         db.close()
 
@@ -40,6 +41,7 @@ def _refresh_news() -> None:
         refresh_news(db)
     except Exception:
         log.exception("News refresh failed")
+        raise
     finally:
         db.close()
 
@@ -52,6 +54,7 @@ def _refresh_calendar() -> None:
         refresh_calendar(db)
     except Exception:
         log.exception("Calendar refresh failed")
+        raise
     finally:
         db.close()
 
@@ -90,6 +93,7 @@ def _retrain_ml() -> None:
         log.info("ML retrain: %s", result)
     except Exception:
         log.exception("ML retrain failed")
+        raise
     finally:
         db.close()
 
@@ -110,6 +114,7 @@ def _signal_cycle() -> None:
                  r.get("duplicate"), (r.get("paper") or {}).get("status"))
     except Exception:
         log.exception("Signal cycle failed")
+        raise
     finally:
         db.close()
 
@@ -122,10 +127,62 @@ def _paper_tick() -> None:
         r = tick(db)
         if r.get("status") not in ("idle", "disabled"):
             log.info("Paper tick: %s", r)
+            from services.notify import notify_paper_changes
+            notify_paper_changes(r)
     except Exception:
         log.exception("Paper tick failed")
+        raise
     finally:
         db.close()
+
+
+def _resolve_signal_outcomes() -> None:
+    from database import SessionLocal
+    from services.signal_outcomes import resolve_pending
+    db = SessionLocal()
+    try:
+        resolve_pending(db)
+    except Exception:
+        db.rollback()
+        log.exception("Signal outcome resolution failed")
+        raise
+    finally:
+        db.close()
+
+
+def _watchdog() -> None:
+    from services.watchdog import run_checks
+    run_checks()
+
+
+def _daily_summary() -> None:
+    from database import SessionLocal
+    from services.notify import daily_summary_text
+    from services.telegram_service import broadcast
+    db = SessionLocal()
+    try:
+        broadcast(daily_summary_text(db))
+    except Exception:
+        log.exception("Daily summary failed")
+        raise
+    finally:
+        db.close()
+
+
+def _tracked(job_id: str, fn):
+    """Jobs log their own exceptions and re-raise; this records the outcome for the
+    watchdog and swallows the error so APScheduler does not log it a second time."""
+    from services.watchdog import record_job_result
+
+    def run() -> None:
+        try:
+            fn()
+        except Exception as exc:
+            record_job_result(job_id, False, f"{type(exc).__name__}: {exc}")
+            return
+        record_job_result(job_id, True)
+    run.__name__ = run.__qualname__ = fn.__name__  # readable job names in logs
+    return run
 
 
 def init_scheduler() -> BackgroundScheduler:
@@ -136,16 +193,25 @@ def init_scheduler() -> BackgroundScheduler:
     _scheduler = BackgroundScheduler(timezone="UTC")
     import os
     from apscheduler.triggers.cron import CronTrigger
-    # Twelvedata free tier ≈ 800 requests/day: candles 3×96 + paper M5 ≤288 + cycle 2×24 ≈ 624/day
-    _scheduler.add_job(_refresh_candles, IntervalTrigger(minutes=int(os.getenv("CANDLE_REFRESH_MINUTES", "15"))),
+    # Twelvedata free tier ≈ 800 requests/day: candles 3×96 + paper M5 ≤288 + cycle 2×24
+    # + signal outcomes ≤48 (M5, only while a recent signal is unresolved) ≈ 672/day
+    _scheduler.add_job(_tracked("candles", _refresh_candles), IntervalTrigger(minutes=int(os.getenv("CANDLE_REFRESH_MINUTES", "15"))),
                        id="candles", max_instances=1, replace_existing=True)
     if os.getenv("SIGNAL_CYCLE_ENABLED", "true").lower() in ("1", "true", "yes"):
-        _scheduler.add_job(_signal_cycle, CronTrigger(minute=3), id="signal_cycle", max_instances=1, replace_existing=True)
+        _scheduler.add_job(_tracked("signal_cycle", _signal_cycle), CronTrigger(minute=3), id="signal_cycle", max_instances=1, replace_existing=True)
     if os.getenv("PAPER_TRADING_ENABLED", "true").lower() in ("1", "true", "yes"):
-        _scheduler.add_job(_paper_tick, IntervalTrigger(minutes=5), id="paper_tick", max_instances=1, replace_existing=True)
-    _scheduler.add_job(_refresh_news, IntervalTrigger(minutes=30), id="news", max_instances=1, replace_existing=True)
-    _scheduler.add_job(_refresh_calendar, IntervalTrigger(hours=1), id="calendar", max_instances=1, replace_existing=True)
-    _scheduler.add_job(_retrain_ml, IntervalTrigger(hours=24), id="ml_train", max_instances=1, replace_existing=True)
+        _scheduler.add_job(_tracked("paper_tick", _paper_tick), IntervalTrigger(minutes=5), id="paper_tick", max_instances=1, replace_existing=True)
+    _scheduler.add_job(_tracked("signal_outcomes", _resolve_signal_outcomes), IntervalTrigger(minutes=30), id="signal_outcomes",
+                       max_instances=1, replace_existing=True)
+    _scheduler.add_job(_tracked("news", _refresh_news), IntervalTrigger(minutes=30), id="news", max_instances=1, replace_existing=True)
+    _scheduler.add_job(_tracked("calendar", _refresh_calendar), IntervalTrigger(hours=1), id="calendar", max_instances=1, replace_existing=True)
+    _scheduler.add_job(_tracked("ml_train", _retrain_ml), IntervalTrigger(hours=24), id="ml_train", max_instances=1, replace_existing=True)
+    _scheduler.add_job(_watchdog, IntervalTrigger(minutes=2), id="watchdog", max_instances=1, replace_existing=True)
+    if os.getenv("DAILY_SUMMARY_ENABLED", "true").lower() in ("1", "true", "yes"):
+        # after the NY close, Mon–Fri
+        _scheduler.add_job(_tracked("daily_summary", _daily_summary),
+                           CronTrigger(day_of_week="mon-fri", hour=21, minute=10), id="daily_summary",
+                           max_instances=1, replace_existing=True)
     _scheduler.start()
     log.info("Scheduler started")
     return _scheduler

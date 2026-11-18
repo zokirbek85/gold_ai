@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     SIGNAL_MIN_CONFIDENCE: float = 65.0
     # "v2" = backend/strategy (default), "legacy" = weighted-score engine in signal_service
     SIGNAL_ENGINE: str = "v2"
+    # Quality gate for the legacy engine (v2 has its own: H4 only, min_rr in StrategyConfig)
+    SIGNAL_MIN_TF_MINUTES: int = 60
+    SIGNAL_MIN_RR: float = 1.5
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

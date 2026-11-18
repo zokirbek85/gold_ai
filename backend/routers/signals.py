@@ -45,6 +45,15 @@ class SignalOut(BaseModel):
     tp1_distance_pct: Optional[float] = None
     tp2_distance_pct: Optional[float] = None
     tp3_distance_pct: Optional[float] = None
+    status: Optional[str] = None
+    outcome: Optional[str] = None
+    outcome_r: Optional[float] = None
+    mfe_r: Optional[float] = None
+    mae_r: Optional[float] = None
+    tp1_hit: Optional[bool] = None
+    exit_price: Optional[float] = None
+    exit_time: Optional[datetime] = None
+    resolution_tf: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -135,6 +144,34 @@ def _apply_confluence(
     return result
 
 
+def apply_quality_gate(result: Dict[str, Any]) -> Dict[str, Any]:
+    """Legacy engine: no BUY/SELL below SIGNAL_MIN_TF_MINUTES or under SIGNAL_MIN_RR.
+
+    Measured on stored signals (Jun–Aug 2026): M1 BUY 11 trades, 18% win, −0.67R;
+    average R:R 1.08 with a 39% win rate is a structural loss. Lower timeframes may
+    still be used for entry timing, but they do not emit trade signals.
+    """
+    from config import settings as _s
+    if result.get("signal_type") not in ("BUY", "SELL"):
+        return result
+    try:
+        tf_min = int(result.get("timeframe") or 0)
+    except (TypeError, ValueError):
+        tf_min = 0
+    rr = result.get("rr") or result.get("risk_reward")
+    why = None
+    if tf_min < _s.SIGNAL_MIN_TF_MINUTES:
+        why = f"QUALITY_GATE: timeframe {tf_min}m < {_s.SIGNAL_MIN_TF_MINUTES}m — faqat kirish vaqti uchun"
+    elif rr is None or float(rr) < _s.SIGNAL_MIN_RR:
+        why = f"QUALITY_GATE: R:R {rr} < {_s.SIGNAL_MIN_RR}"
+    if why:
+        result.update({"original_signal_type": result["signal_type"], "signal_type": "NO TRADE",
+                       "direction": "neutral", "stop_loss": None, "take_profit": None, "tp1": None,
+                       "tp3": None, "rr": None, "risk_reward": None,
+                       "reasoning": f"{why} | {result.get('reasoning') or ''}".rstrip(" |")})
+    return result
+
+
 @router.post("/generate")
 def generate(
     payload: GenerateSignalIn,
@@ -215,6 +252,8 @@ def _generate_legacy(payload: GenerateSignalIn, db: Session) -> Dict[str, Any]:
     else:
         result.setdefault("confluence", None)
 
+    result = apply_quality_gate(result)
+
     # Enrich with lot size, distances, plain explanation
     result = enrich_signal(result, payload.account_balance)
 
@@ -255,6 +294,25 @@ def _generate_legacy(payload: GenerateSignalIn, db: Session) -> Dict[str, Any]:
     threading.Thread(target=alert_signal, args=(result,), daemon=True).start()
 
     return result
+
+
+@router.get("/performance")
+def signal_performance(
+    symbol: Optional[str] = "XAUUSD",
+    timeframe: Optional[str] = None,
+    days: Optional[int] = Query(None, ge=1, le=3650),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Measured results of stored BUY/SELL signals (R after costs, by TF/side/session/confidence)."""
+    from services.signal_outcomes import performance
+    return performance(db, symbol=symbol, days=days, timeframe=timeframe)
+
+
+@router.post("/outcomes/resolve")
+def resolve_outcomes(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """Resolve pending signals from stored candles (no provider calls — the scheduler fetches)."""
+    from services.signal_outcomes import resolve_pending
+    return resolve_pending(db, fetch=False)
 
 
 @router.get("", response_model=List[SignalOut])

@@ -166,6 +166,7 @@ def tick(db: Session, now: Optional[datetime] = None, fetch: bool = True, fetch_
     max_hold = timedelta(minutes=cfg.max_hold_bars * cfg.primary_tf)
     changed = []
     for t in active:
+        prev_status = t.status
         pos = process(_to_pos(t), records, RiskConfig(spread=t.spread, slippage=t.slippage,
                                                       commission_per_lot=rc.commission_per_lot,
                                                       swap_long=rc.swap_long, swap_short=rc.swap_short,
@@ -176,7 +177,10 @@ def tick(db: Session, now: Optional[datetime] = None, fetch: bool = True, fetch_
         if pos.status == "CLOSED" and pos.pnl_usd is not None:
             acc.balance = round(acc.balance + pos.pnl_usd, 2)
             acc.peak_balance = max(acc.peak_balance, acc.balance)
-        changed.append({"id": t.id, "status": t.status, "exit_reason": t.exit_reason, "r": t.r_multiple})
+        changed.append({"id": t.id, "status": t.status, "prev_status": prev_status, "direction": t.direction,
+                        "exit_reason": t.exit_reason, "r": t.r_multiple, "pnl_usd": t.pnl_usd,
+                        "fill_price": t.fill_price, "exit_price": t.exit_price, "stop_loss": t.stop_loss,
+                        "take_profit": t.take_profit, "lots": t.lots})
     db.commit()
     stale = age > 3 * BAR_MINUTES
     if stale:
